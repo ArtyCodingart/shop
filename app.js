@@ -16,6 +16,7 @@ const state = {
   pendingLogin: false,
   pendingProfile: false,
   pendingReservation: false,
+  pendingSwitch: false,
   pendingCancel: false,
   firestore: null,
   firebaseReady: false,
@@ -94,7 +95,7 @@ function bindEvents() {
     }
   });
   elements.keepCurrentGiftButton.addEventListener('click', closeSwitchChoiceModal);
-  elements.goToCancelGiftButton.addEventListener('click', moveFromSwitchToCancel);
+  elements.goToCancelGiftButton.addEventListener('click', switchConfirmedGift);
   elements.keepGiftButton.addEventListener('click', closeCancelSelectionModal);
   elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
   document.addEventListener('keydown', (event) => {
@@ -390,7 +391,7 @@ function renderSelectedGift() {
     </div>
     <img src="${escapeAttribute(selectedGift.imageUrl)}" alt="${escapeAttribute(selectedGift.title)}">
     <div class="cancel-gift-panel">
-      <p>Если вы решили купить другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
+      <p>Если вы решили освободить подарок для других гостей и пока ничего не выбирать, можно отказаться от него.</p>
       <button class="soft-danger-action" id="cancelGiftButton" type="button">Отказаться от подарка</button>
     </div>
   `;
@@ -568,7 +569,7 @@ function openSwitchChoiceModal(gift) {
   }
 
   state.switchGift = gift;
-  elements.switchChoiceText.textContent = `Сейчас за вами закреплен подарок «${selectedGift.title}». Если вы хотите выбрать «${gift.title}», сначала нужно отказаться от текущего подарка. После отказа он снова станет доступен другим гостям, а новый подарок нужно будет подтвердить отдельным нажатием.`;
+  elements.switchChoiceText.textContent = `Сейчас за вами закреплен подарок «${selectedGift.title}». Если подтвердить смену, мы сразу освободим его для других гостей и закрепим за вами «${gift.title}».`;
   elements.switchChoicePreview.innerHTML = `
     <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}">
     <div>
@@ -580,13 +581,85 @@ function openSwitchChoiceModal(gift) {
 }
 
 function closeSwitchChoiceModal() {
+  if (state.pendingSwitch) {
+    return;
+  }
+
   elements.switchChoiceModal.classList.add('hidden');
   state.switchGift = null;
 }
 
-function moveFromSwitchToCancel() {
-  closeSwitchChoiceModal();
-  openCancelSelectionModal();
+async function switchConfirmedGift() {
+  const previousGift = getConfirmedSelectedGift();
+  const nextGift = state.switchGift;
+
+  if (!previousGift || !nextGift || !state.profile || !state.firestore) {
+    return;
+  }
+
+  const { doc, runTransaction, serverTimestamp } = state.firebaseApi;
+  const previousReservationRef = doc(state.firestore, 'reservations', previousGift.id);
+  const nextReservationRef = doc(state.firestore, 'reservations', nextGift.id);
+  const userRef = doc(state.firestore, 'users', state.profile.phone);
+
+  try {
+    state.pendingSwitch = true;
+    elements.keepCurrentGiftButton.disabled = true;
+    elements.goToCancelGiftButton.disabled = true;
+    elements.goToCancelGiftButton.textContent = 'Меняем...';
+
+    await runTransaction(state.firestore, async (transaction) => {
+      const [previousReservation, nextReservation] = await Promise.all([
+        transaction.get(previousReservationRef),
+        transaction.get(nextReservationRef)
+      ]);
+
+      if (!previousReservation.exists() || previousReservation.data().phone !== state.profile.phone) {
+        throw new Error('Current gift is no longer reserved by this user');
+      }
+
+      if (nextReservation.exists()) {
+        throw new Error('Next gift is already reserved');
+      }
+
+      transaction.delete(previousReservationRef);
+      transaction.set(nextReservationRef, {
+        phone: state.profile.phone,
+        giftId: nextGift.id,
+        firstName: state.profile.firstName,
+        lastName: state.profile.lastName,
+        displayName: state.profile.displayName,
+        createdAt: serverTimestamp()
+      });
+      transaction.set(userRef, {
+        selectedGiftId: nextGift.id,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    });
+
+    state.profile.selectedGiftId = nextGift.id;
+    state.reservations.delete(previousGift.id);
+    state.reservations.set(nextGift.id, {
+      phone: state.profile.phone,
+      giftId: nextGift.id,
+      firstName: state.profile.firstName,
+      lastName: state.profile.lastName,
+      displayName: state.profile.displayName
+    });
+    elements.switchChoiceModal.classList.add('hidden');
+    state.switchGift = null;
+    showToast('Выбор изменен. Новый подарок закреплен за вами.');
+    renderSelectedGift();
+    renderGifts();
+  } catch (error) {
+    showToast('Не получилось сменить подарок. Возможно, новый подарок уже выбрали.');
+    console.error(error);
+  } finally {
+    state.pendingSwitch = false;
+    elements.keepCurrentGiftButton.disabled = false;
+    elements.goToCancelGiftButton.disabled = false;
+    elements.goToCancelGiftButton.textContent = 'Да, хочу сменить';
+  }
 }
 
 async function reserveConfirmedGift() {
