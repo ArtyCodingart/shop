@@ -78,6 +78,16 @@ if (app.includes('babyGiftRegistry.profile') || app.includes('babyGiftRegistry.s
   throw new Error('app.js must only persist the phone number locally');
 }
 
+if (app.includes('gift.price') || app.includes('confirmGift.price')) {
+  throw new Error('cards and confirmation modal must not render gift prices');
+}
+
+for (const forbiddenText of ['Малыш уже родился', 'Маркетплейс', 'Можно выбрать.']) {
+  if (html.includes(forbiddenText) || app.includes(forbiddenText)) {
+    throw new Error(`UI still contains forbidden text: ${forbiddenText}`);
+  }
+}
+
 if (!config.includes('window.giftRegistryFirebase')) {
   throw new Error('firebase-config.js must expose window.giftRegistryFirebase');
 }

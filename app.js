@@ -373,7 +373,6 @@ function renderSelectedGift() {
       <p>${escapeHtml(selectedGift.description)}</p>
       <div class="selected-meta">
         <span>${escapeHtml(selectedGift.category)}</span>
-        <strong>${escapeHtml(selectedGift.price)}</strong>
       </div>
       <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Открыть магазин</a>
       <div class="cancel-gift-panel">
@@ -416,11 +415,10 @@ function renderGifts() {
       <div class="gift-body">
         <div class="gift-topline">
           <span>${escapeHtml(gift.category)}</span>
-          <span>${escapeHtml(gift.price)}</span>
         </div>
         <h2>${escapeHtml(gift.title)}</h2>
         <p>${escapeHtml(gift.description)}</p>
-        <p>${getAvailabilityText(isReserved, reservation, isOwnSelection)}</p>
+        ${getAvailabilityText(isReserved, reservation, isOwnSelection) ? `<p>${getAvailabilityText(isReserved, reservation, isOwnSelection)}</p>` : ''}
         <button class="gift-action" type="button" ${isGiftActionDisabled(isReserved, isOwnSelection, userAlreadySelected) ? 'disabled' : ''}>
           ${getActionText(isReserved, isOwnSelection, userAlreadySelected)}
         </button>
@@ -502,7 +500,7 @@ function getAvailabilityText(isReserved, reservation, isOwnSelection) {
     return 'Вы уже выбрали один подарок для покупки.';
   }
 
-  return 'Можно выбрать.';
+  return '';
 }
 
 function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
@@ -515,7 +513,7 @@ function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
   }
 
   if (userAlreadySelected) {
-    return 'Можно выбрать только один';
+    return 'Уже есть выбор';
   }
 
   if (!state.firebaseReady || state.reservationsFailed) {
@@ -536,7 +534,7 @@ function openConfirmModal(gift) {
     <img src="${escapeAttribute(state.confirmGift.imageUrl)}" alt="${escapeAttribute(state.confirmGift.title)}">
     <div>
       <strong>${escapeHtml(state.confirmGift.title)}</strong>
-      <span>${escapeHtml(state.confirmGift.price)}</span>
+      <span>${escapeHtml(state.confirmGift.description)}</span>
     </div>
   `;
   elements.confirmGiftButton.disabled = false;

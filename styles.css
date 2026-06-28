@@ -419,6 +419,13 @@ input:focus {
   font-size: 1.6rem;
 }
 
+.section-copy {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .gift-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -467,7 +474,7 @@ input:focus {
 
 .gift-topline {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   color: var(--muted);
   font-size: 0.82rem;
