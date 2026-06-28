@@ -1,7 +1,6 @@
-import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
-
 const STORAGE_PROFILE_KEY = 'babyGiftRegistry.profile';
 const STORAGE_SELECTION_KEY = 'babyGiftRegistry.selection';
+const firebaseSettings = window.giftRegistryFirebase || { config: {}, isConfigured: false };
 
 const state = {
   profile: null,
@@ -45,6 +44,7 @@ async function init() {
   restoreProfile();
   await loadGifts();
   await setupFirebase();
+  showLocalFileHint();
   render();
 }
 
@@ -98,7 +98,7 @@ async function loadGifts() {
 }
 
 async function setupFirebase() {
-  if (!isFirebaseConfigured) {
+  if (!firebaseSettings.isConfigured) {
     showBanner('Firebase еще не настроен. Каталог работает в режиме просмотра, бронирование станет доступно после настройки.');
     return;
   }
@@ -108,7 +108,7 @@ async function setupFirebase() {
       import('https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js')
     ]);
-    const app = initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseSettings.config);
 
     state.firebaseApi = firestoreApi;
     state.firestore = firestoreApi.getFirestore(app);
@@ -117,6 +117,12 @@ async function setupFirebase() {
   } catch (error) {
     showBanner('Не удалось подключиться к Firebase. Доступность подарков временно не обновляется.');
     console.error(error);
+  }
+}
+
+function showLocalFileHint() {
+  if (location.protocol === 'file:') {
+    showBanner('Страница открыта как файл. Для полного локального предпросмотра запустите: python3 -m http.server 4173 и откройте http://localhost:4173');
   }
 }
 

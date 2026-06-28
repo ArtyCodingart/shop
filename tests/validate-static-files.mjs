@@ -11,7 +11,8 @@ const requiredHtmlSnippets = [
   'id="giftGrid"',
   'id="giftModal"',
   'id="reserveButton"',
-  'type="module" src="./app.js"'
+  'defer src="./firebase-config.js"',
+  'defer src="./app.js"'
 ];
 
 for (const snippet of requiredHtmlSnippets) {
@@ -25,7 +26,8 @@ const requiredAppSnippets = [
   "babyGiftRegistry.selection",
   "fetch('./gifts.json'",
   "collection(state.firestore, 'reservations')",
-  "window.confirm('Вы точно уверены"
+  "window.confirm('Вы точно уверены",
+  "location.protocol === 'file:'"
 ];
 
 for (const snippet of requiredAppSnippets) {
@@ -34,8 +36,12 @@ for (const snippet of requiredAppSnippets) {
   }
 }
 
-if (!config.includes('isFirebaseConfigured')) {
-  throw new Error('firebase-config.js must export isFirebaseConfigured');
+if (app.includes("import { firebaseConfig, isFirebaseConfigured }")) {
+  throw new Error('app.js must not use a static module import for local file previews');
+}
+
+if (!config.includes('window.giftRegistryFirebase')) {
+  throw new Error('firebase-config.js must expose window.giftRegistryFirebase');
 }
 
 console.log('Validated static app files');

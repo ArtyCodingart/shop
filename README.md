@@ -4,6 +4,8 @@ Static GitHub Pages site where friends can choose one baby gift. The public gift
 
 ## Local Preview
 
+Do not open `index.html` directly through `file://`. Browsers restrict local module/data loading, so use a local static server:
+
 ```bash
 python3 -m http.server 4173
 ```
