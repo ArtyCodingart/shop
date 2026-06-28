@@ -385,9 +385,6 @@ function renderSelectedGift() {
     <div class="selected-copy">
       <p class="eyebrow">Вы выбрали подарок</p>
       <h2 id="selectedGiftTitle">${escapeHtml(selectedGift.title)}</h2>
-      <div class="selected-meta">
-        <span>${escapeHtml(selectedGift.category)}</span>
-      </div>
       <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Где его купить</a>
       <p>${escapeHtml(selectedGift.description)}</p>
     </div>
@@ -514,10 +511,6 @@ function getAvailabilityText(isReserved, reservation, isOwnSelection) {
 
   if (!state.firebaseReady || state.reservationsFailed) {
     return 'Покупка временно недоступна.';
-  }
-
-  if (state.profile?.selectedGiftId) {
-    return 'Вы уже выбрали один подарок для покупки.';
   }
 
   return '';
