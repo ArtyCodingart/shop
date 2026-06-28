@@ -10,16 +10,16 @@ const requiredHtmlSnippets = [
   'id="bootView"',
   'id="loginForm"',
   'id="phoneNumber"',
+  'id="loginButton"',
   'id="registerView"',
   'id="registerForm"',
+  'id="registerButton"',
   'id="selectedGiftSection"',
   'id="giftGrid"',
-  'id="giftModal"',
   'id="confirmModal"',
   'id="confirmGiftButton"',
   'id="cancelSelectionModal"',
   'id="confirmCancelGiftButton"',
-  'id="reserveButton"',
   'defer src="./firebase-config.js"',
   'defer src="./app.js"'
 ];
@@ -37,6 +37,10 @@ const requiredAppSnippets = [
   "loadUserByPhone",
   "createUserProfile",
   "deleteDoc",
+  "openMarketLink",
+  "event.stopPropagation()",
+  "pendingLogin",
+  "pendingProfile",
   'id="cancelGiftButton"',
   "selectedGiftId",
   'reservationsLoaded',
@@ -59,6 +63,10 @@ if (app.includes("import { firebaseConfig, isFirebaseConfigured }")) {
 
 if (app.includes('window.confirm')) {
   throw new Error('app.js must use the custom confirmation modal instead of window.confirm');
+}
+
+if (html.includes('id="giftModal"') || app.includes('giftModal') || app.includes('openModal')) {
+  throw new Error('product detail modal must be removed; cards should open marketplace links directly');
 }
 
 if (app.includes('babyGiftRegistry.profile') || app.includes('babyGiftRegistry.selection')) {

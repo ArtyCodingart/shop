@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Список подарков для малыша</title>
+    <title>Подарки для малыша</title>
     <meta
       name="description"
-      content="Теплый список подарков для друзей: выберите один подарок для малыша."
+      content="Малыш уже родился: выберите подарок, который хотите купить."
     >
     <link rel="stylesheet" href="./styles.css">
   </head>
@@ -16,16 +16,16 @@
         <div class="boot-mark">
           <span></span>
           <strong>Список подарков</strong>
-          <small>готовим уютный выбор</small>
+          <small>малыш уже родился</small>
         </div>
       </section>
 
       <section class="login-view hidden" id="loginView" aria-labelledby="loginTitle">
         <div class="login-panel">
-          <p class="eyebrow">Скоро встречаем малыша</p>
-          <h1 id="loginTitle">Выберите подарок, который хотите подарить</h1>
+          <p class="eyebrow">Малыш уже родился</p>
+          <h1 id="loginTitle">Выберите подарок для малыша</h1>
           <p class="login-copy">
-            Введите номер телефона, чтобы открыть ваш список и выбранный подарок.
+            Введите номер телефона, чтобы открыть список и увидеть ваш выбранный подарок.
           </p>
 
           <form class="login-form" id="loginForm">
@@ -33,7 +33,7 @@
               <span>Телефон</span>
               <input id="phoneNumber" name="phoneNumber" type="tel" autocomplete="tel" inputmode="tel" required minlength="7" placeholder="+7 700 000 00 00">
             </label>
-            <button type="submit">Войти к списку</button>
+            <button id="loginButton" type="submit">Войти к списку</button>
           </form>
         </div>
       </section>
@@ -41,9 +41,9 @@
       <section class="login-view hidden" id="registerView" aria-labelledby="registerTitle">
         <div class="login-panel">
           <p class="eyebrow">Первый вход</p>
-          <h1 id="registerTitle">Как вас подписать?</h1>
+          <h1 id="registerTitle">Как вас подписать в списке?</h1>
           <p class="login-copy">
-            Мы сохраним имя в списке, чтобы друзья видели, кто выбрал подарок.
+            Мы сохраним имя, чтобы остальные видели, кто покупает выбранный подарок.
           </p>
 
           <form class="login-form" id="registerForm">
@@ -55,7 +55,7 @@
               <span>Фамилия</span>
               <input id="registerLastName" name="registerLastName" type="text" autocomplete="family-name" required minlength="2">
             </label>
-            <button type="submit">Сохранить и открыть список</button>
+            <button id="registerButton" type="submit">Сохранить и открыть список</button>
           </form>
         </div>
       </section>
@@ -64,51 +64,34 @@
         <header class="catalog-header">
           <div>
             <p class="eyebrow">Подарки для малыша</p>
-            <h1 id="catalogTitle">Список желанных подарков</h1>
-            <p id="catalogSubtitle">Выберите один свободный подарок из списка.</p>
+            <h1 id="catalogTitle">Малыш уже родился</h1>
+            <p id="catalogSubtitle">Выберите один подарок, который хотите купить. Карточка открывает магазин, кнопка закрепляет выбор.</p>
           </div>
           <div class="profile-card">
             <span id="profileName"></span>
-            <button class="ghost-button" id="changeProfileButton" type="button">Сменить имя</button>
+            <button class="ghost-button" id="changeProfileButton" type="button">Сменить телефон</button>
           </div>
         </header>
 
         <div class="status-banner hidden" id="statusBanner" role="status"></div>
         <section class="selected-gift hidden" id="selectedGiftSection" aria-labelledby="selectedGiftTitle"></section>
         <div class="section-heading">
-          <p class="eyebrow">Общий список</p>
+          <p class="eyebrow">Маркетплейс</p>
           <h2>Все подарки</h2>
         </div>
         <div class="gift-grid" id="giftGrid" aria-live="polite"></div>
       </section>
     </main>
 
-    <div class="modal-backdrop hidden" id="giftModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <article class="gift-modal">
-        <button class="modal-close" id="modalCloseButton" type="button" aria-label="Закрыть">×</button>
-        <img id="modalImage" alt="">
-        <div class="modal-content">
-          <p class="eyebrow" id="modalCategory"></p>
-          <h2 id="modalTitle"></h2>
-          <p class="modal-price" id="modalPrice"></p>
-          <p id="modalDescription"></p>
-          <p id="modalDetails"></p>
-          <a class="market-link" id="modalMarketLink" target="_blank" rel="noreferrer">Открыть на маркетплейсе</a>
-          <button class="primary-action" id="reserveButton" type="button">Я хочу подарить этот подарок</button>
-          <p class="modal-note" id="modalNote"></p>
-        </div>
-      </article>
-    </div>
-
     <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <article class="confirm-dialog">
         <p class="eyebrow">Подтверждение</p>
-        <h2 id="confirmTitle">Подарить этот подарок?</h2>
+        <h2 id="confirmTitle">Купить этот подарок?</h2>
         <p id="confirmText"></p>
         <div class="confirm-preview" id="confirmPreview"></div>
         <div class="confirm-actions">
           <button class="ghost-button" id="cancelConfirmButton" type="button">Вернуться к выбору</button>
-          <button class="primary-action" id="confirmGiftButton" type="button">Да, это мой подарок</button>
+          <button class="primary-action" id="confirmGiftButton" type="button">Да, я хочу купить</button>
         </div>
       </article>
     </div>

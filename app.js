@@ -11,8 +11,9 @@ const state = {
   reservationsFailed: false,
   gifts: [],
   reservations: new Map(),
-  activeGift: null,
   confirmGift: null,
+  pendingLogin: false,
+  pendingProfile: false,
   pendingReservation: false,
   pendingCancel: false,
   firestore: null,
@@ -28,24 +29,15 @@ const elements = {
   loginForm: document.querySelector('#loginForm'),
   registerForm: document.querySelector('#registerForm'),
   phoneNumber: document.querySelector('#phoneNumber'),
+  loginButton: document.querySelector('#loginButton'),
   registerFirstName: document.querySelector('#registerFirstName'),
   registerLastName: document.querySelector('#registerLastName'),
+  registerButton: document.querySelector('#registerButton'),
   profileName: document.querySelector('#profileName'),
   changeProfileButton: document.querySelector('#changeProfileButton'),
   statusBanner: document.querySelector('#statusBanner'),
   selectedGiftSection: document.querySelector('#selectedGiftSection'),
   giftGrid: document.querySelector('#giftGrid'),
-  giftModal: document.querySelector('#giftModal'),
-  modalCloseButton: document.querySelector('#modalCloseButton'),
-  modalImage: document.querySelector('#modalImage'),
-  modalCategory: document.querySelector('#modalCategory'),
-  modalTitle: document.querySelector('#modalTitle'),
-  modalPrice: document.querySelector('#modalPrice'),
-  modalDescription: document.querySelector('#modalDescription'),
-  modalDetails: document.querySelector('#modalDetails'),
-  modalMarketLink: document.querySelector('#modalMarketLink'),
-  reserveButton: document.querySelector('#reserveButton'),
-  modalNote: document.querySelector('#modalNote'),
   confirmModal: document.querySelector('#confirmModal'),
   confirmText: document.querySelector('#confirmText'),
   confirmPreview: document.querySelector('#confirmPreview'),
@@ -77,13 +69,6 @@ function bindEvents() {
   elements.loginForm.addEventListener('submit', handlePhoneLogin);
   elements.registerForm.addEventListener('submit', createUserProfile);
   elements.changeProfileButton.addEventListener('click', clearProfile);
-  elements.modalCloseButton.addEventListener('click', closeModal);
-  elements.giftModal.addEventListener('click', (event) => {
-    if (event.target === elements.giftModal) {
-      closeModal();
-    }
-  });
-  elements.reserveButton.addEventListener('click', openConfirmModal);
   elements.confirmModal.addEventListener('click', (event) => {
     if (event.target === elements.confirmModal) {
       closeConfirmModal();
@@ -95,7 +80,6 @@ function bindEvents() {
   elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      closeModal();
       closeConfirmModal();
       closeCancelSelectionModal();
     }
@@ -123,7 +107,7 @@ async function setupFirebase() {
   if (!firebaseSettings.isConfigured) {
     state.reservationsLoaded = true;
     state.reservationsFailed = true;
-    showBanner('Firebase еще не настроен. Каталог работает в режиме просмотра, бронирование станет доступно после настройки.');
+    showBanner('Firebase еще не настроен. Каталог работает в режиме просмотра, покупка станет доступна после настройки.');
     return;
   }
 
@@ -164,7 +148,6 @@ function subscribeToReservations() {
       syncSelectedGift();
       renderGifts();
       renderSelectedGift();
-      updateActiveModalState();
     },
     (error) => {
       state.reservationsLoaded = true;
@@ -190,10 +173,22 @@ async function handlePhoneLogin(event) {
     return;
   }
 
-  state.phone = phone;
-  localStorage.setItem(STORAGE_PHONE_KEY, phone);
-  await loadUserByPhone(phone);
-  render();
+  try {
+    state.pendingLogin = true;
+    elements.loginButton.disabled = true;
+    elements.loginButton.textContent = 'Ищем вас...';
+    state.phone = phone;
+    localStorage.setItem(STORAGE_PHONE_KEY, phone);
+    await loadUserByPhone(phone);
+    render();
+  } catch (error) {
+    showToast('Не получилось войти. Попробуйте еще раз.');
+    console.error(error);
+  } finally {
+    state.pendingLogin = false;
+    elements.loginButton.disabled = false;
+    elements.loginButton.textContent = 'Войти к списку';
+  }
 }
 
 async function loadUserByPhone(phone) {
@@ -238,13 +233,25 @@ async function createUserProfile(event) {
     updatedAt: serverTimestamp()
   };
 
-  await setDoc(doc(state.firestore, 'users', state.pendingPhone), profile);
-  state.profile = normalizeUser(profile);
-  state.phone = state.pendingPhone;
-  state.pendingPhone = null;
-  localStorage.setItem(STORAGE_PHONE_KEY, state.phone);
-  showToast('Профиль сохранен.');
-  render();
+  try {
+    state.pendingProfile = true;
+    elements.registerButton.disabled = true;
+    elements.registerButton.textContent = 'Сохраняем...';
+    await setDoc(doc(state.firestore, 'users', state.pendingPhone), profile);
+    state.profile = normalizeUser(profile);
+    state.phone = state.pendingPhone;
+    state.pendingPhone = null;
+    localStorage.setItem(STORAGE_PHONE_KEY, state.phone);
+    showToast('Профиль сохранен.');
+    render();
+  } catch (error) {
+    showToast('Не получилось сохранить профиль. Попробуйте еще раз.');
+    console.error(error);
+  } finally {
+    state.pendingProfile = false;
+    elements.registerButton.disabled = false;
+    elements.registerButton.textContent = 'Сохранить и открыть список';
+  }
 }
 
 function normalizeUser(user) {
@@ -278,7 +285,6 @@ function clearProfile() {
   state.pendingPhone = null;
   state.profile = null;
   elements.phoneNumber.value = '';
-  closeModal();
   closeConfirmModal();
   closeCancelSelectionModal();
   render();
@@ -335,10 +341,10 @@ function renderSelectedGift() {
         <span>${escapeHtml(selectedGift.category)}</span>
         <strong>${escapeHtml(selectedGift.price)}</strong>
       </div>
-      <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Открыть на маркетплейсе</a>
+      <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Открыть магазин</a>
       <div class="cancel-gift-panel">
-        <button class="soft-danger-action" id="cancelGiftButton" type="button">Передумал\`а дарить подарок</button>
-        <p>Если вы решили выбрать другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
+        <button class="soft-danger-action" id="cancelGiftButton" type="button">Передумал\`а покупать подарок</button>
+        <p>Если вы решили купить другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
       </div>
     </div>
     <img src="${escapeAttribute(selectedGift.imageUrl)}" alt="${escapeAttribute(selectedGift.title)}">
@@ -368,6 +374,9 @@ function renderGifts() {
     const card = document.createElement('article');
 
     card.className = `gift-card${isReserved ? ' reserved' : ''}${isOwnSelection ? ' own-gift' : ''}`;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'link');
+    card.setAttribute('aria-label', `Открыть магазин: ${gift.title}`);
     card.innerHTML = `
       <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}" loading="lazy">
       <div class="gift-body">
@@ -385,9 +394,22 @@ function renderGifts() {
     `;
 
     const button = card.querySelector('button');
-    button.addEventListener('click', () => openModal(gift));
+    card.addEventListener('click', () => openMarketLink(gift));
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        openMarketLink(gift);
+      }
+    });
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openConfirmModal(gift);
+    });
     elements.giftGrid.append(card);
   }
+}
+
+function openMarketLink(gift) {
+  window.open(gift.marketUrl, '_blank', 'noopener,noreferrer');
 }
 
 function shouldShowSkeleton() {
@@ -395,7 +417,7 @@ function shouldShowSkeleton() {
 }
 
 function renderSkeletonCards() {
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     const card = document.createElement('article');
     card.className = 'gift-card skeleton-card';
     card.innerHTML = `
@@ -431,22 +453,22 @@ function getConfirmedSelectedGift() {
 
 function getAvailabilityText(isReserved, reservation, isOwnSelection) {
   if (isOwnSelection) {
-    return 'Ваш подарок уже закреплен.';
+    return 'Вы покупаете этот подарок.';
   }
 
   if (isReserved) {
-    return `Уже дарит ${reservation.displayName}.`;
+    return `Уже покупает ${reservation.displayName}.`;
   }
 
   if (!state.firebaseReady || state.reservationsFailed) {
-    return 'Бронирование временно недоступно.';
+    return 'Покупка временно недоступна.';
   }
 
   if (state.profile?.selectedGiftId) {
-    return 'Вы уже выбрали один подарок.';
+    return 'Вы уже выбрали один подарок для покупки.';
   }
 
-  return 'Свободен для выбора.';
+  return 'Можно выбрать.';
 }
 
 function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
@@ -455,7 +477,7 @@ function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
   }
 
   if (isReserved) {
-    return 'Уже занят';
+    return 'Уже купят';
   }
 
   if (userAlreadySelected) {
@@ -466,70 +488,16 @@ function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
     return 'Загрузка статуса';
   }
 
-  return 'Посмотреть';
+  return 'Я хочу купить';
 }
 
-function openModal(gift) {
-  state.activeGift = gift;
-  elements.modalImage.src = gift.imageUrl;
-  elements.modalImage.alt = gift.title;
-  elements.modalCategory.textContent = gift.category;
-  elements.modalTitle.textContent = gift.title;
-  elements.modalPrice.textContent = gift.price;
-  elements.modalDescription.textContent = gift.description;
-  elements.modalDetails.textContent = gift.details;
-  elements.modalMarketLink.href = gift.marketUrl;
-  elements.giftModal.classList.remove('hidden');
-  updateActiveModalState();
-}
-
-function closeModal() {
-  elements.giftModal.classList.add('hidden');
-  state.activeGift = null;
-}
-
-function updateActiveModalState() {
-  if (!state.activeGift) {
+function openConfirmModal(gift) {
+  if (!gift || !state.profile || !state.firestore) {
     return;
   }
 
-  const reservation = state.reservations.get(state.activeGift.id);
-  const isReserved = Boolean(reservation);
-  const isOwnSelection = state.profile?.selectedGiftId === state.activeGift.id && isReserved;
-  const hasOtherSelection = Boolean(state.profile?.selectedGiftId) && !isOwnSelection;
-
-  elements.reserveButton.disabled = isReserved || hasOtherSelection || !state.firebaseReady || state.reservationsFailed;
-
-  if (!state.firebaseReady || state.reservationsFailed) {
-    elements.modalNote.textContent = 'Бронирование станет доступно после загрузки статуса подарков.';
-    return;
-  }
-
-  if (isOwnSelection) {
-    elements.modalNote.textContent = 'Вы уже выбрали этот подарок.';
-    return;
-  }
-
-  if (isReserved) {
-    elements.modalNote.textContent = `Этот подарок уже дарит ${reservation.displayName}.`;
-    return;
-  }
-
-  if (hasOtherSelection) {
-    elements.modalNote.textContent = 'Вы уже выбрали один подарок. Сначала откажитесь от текущего.';
-    return;
-  }
-
-  elements.modalNote.textContent = 'После подтверждения подарок станет недоступен для остальных гостей.';
-}
-
-function openConfirmModal() {
-  if (!state.activeGift || !state.profile || !state.firestore) {
-    return;
-  }
-
-  state.confirmGift = state.activeGift;
-  elements.confirmText.textContent = `Подтвердите, что ${state.profile.displayName} будет дарить этот подарок.`;
+  state.confirmGift = gift;
+  elements.confirmText.textContent = `Подтвердите, что ${state.profile.displayName} хочет купить этот подарок.`;
   elements.confirmPreview.innerHTML = `
     <img src="${escapeAttribute(state.confirmGift.imageUrl)}" alt="${escapeAttribute(state.confirmGift.title)}">
     <div>
@@ -538,7 +506,7 @@ function openConfirmModal() {
     </div>
   `;
   elements.confirmGiftButton.disabled = false;
-  elements.confirmGiftButton.textContent = 'Да, это мой подарок';
+  elements.confirmGiftButton.textContent = 'Да, я хочу купить';
   elements.confirmModal.classList.remove('hidden');
 }
 
@@ -579,7 +547,6 @@ async function reserveConfirmedGift() {
 
     state.profile.selectedGiftId = state.confirmGift.id;
     showToast('Готово! Подарок закреплен за вами.');
-    closeModal();
     elements.confirmModal.classList.add('hidden');
     state.confirmGift = null;
     renderSelectedGift();
@@ -590,10 +557,7 @@ async function reserveConfirmedGift() {
   } finally {
     state.pendingReservation = false;
     elements.confirmGiftButton.disabled = false;
-    elements.confirmGiftButton.textContent = 'Да, это мой подарок';
-    if (state.activeGift) {
-      updateActiveModalState();
-    }
+    elements.confirmGiftButton.textContent = 'Да, я хочу купить';
   }
 }
 

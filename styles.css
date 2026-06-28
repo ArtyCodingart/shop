@@ -275,8 +275,7 @@ input:focus {
 .status-banner,
 .selected-gift,
 .gift-card,
-.confirm-dialog,
-.gift-modal {
+.confirm-dialog {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -390,17 +389,18 @@ input:focus {
 
 .gift-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
 }
 
 .gift-card {
   min-height: 100%;
   display: grid;
-  grid-template-rows: 210px 1fr;
+  grid-template-rows: 168px 1fr;
   overflow: hidden;
   animation: cardIn 0.45s ease both;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  cursor: pointer;
 }
 
 .gift-card:hover:not(.skeleton-card) {
@@ -422,15 +422,15 @@ input:focus {
 .gift-card img,
 .skeleton-image {
   width: 100%;
-  height: 210px;
+  height: 168px;
   object-fit: cover;
   background: var(--oat);
 }
 
 .gift-body {
   display: grid;
-  gap: 10px;
-  padding: 16px;
+  gap: 8px;
+  padding: 12px;
 }
 
 .gift-topline {
@@ -438,25 +438,27 @@ input:focus {
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
 .gift-body h2 {
-  font-size: 1.25rem;
+  font-size: 1.02rem;
+  line-height: 1.18;
 }
 
 .gift-body p {
   margin: 0;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.35;
+  font-size: 0.88rem;
 }
 
 .gift-action {
-  min-height: 46px;
+  min-height: 40px;
   align-self: end;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--ink);
   background: linear-gradient(135deg, #f0c978, #d7a252);
   font-weight: 900;
@@ -523,66 +525,9 @@ input:focus {
   animation: fadeIn 0.22s ease both;
 }
 
-.gift-modal {
-  position: relative;
-  width: min(940px, 100%);
-  max-height: min(860px, calc(100vh - 40px));
-  overflow: auto;
-  display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
-  background: var(--paper);
-  box-shadow: var(--shadow);
-  animation: modalIn 0.28s ease both;
-}
-
-.gift-modal > img {
-  width: 100%;
-  height: 100%;
-  min-height: 430px;
-  object-fit: cover;
-}
-
-.modal-content {
-  display: grid;
-  align-content: center;
-  gap: 14px;
-  padding: 34px;
-}
-
-.modal-content p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.modal-price {
-  color: var(--ink) !important;
-  font-size: 1.25rem;
-  font-weight: 900;
-}
-
 .market-link {
   color: var(--caramel);
   font-weight: 900;
-}
-
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 42px;
-  height: 42px;
-  border: 0;
-  border-radius: 50%;
-  color: var(--ink);
-  background: rgba(255, 250, 241, 0.92);
-  font-size: 1.7rem;
-  line-height: 1;
-}
-
-.modal-note {
-  color: var(--muted);
-  font-size: 0.95rem;
 }
 
 .confirm-dialog {
@@ -739,7 +684,6 @@ input:focus {
 
 @media (max-width: 880px) {
   .catalog-header,
-  .gift-modal,
   .selected-gift {
     grid-template-columns: 1fr;
   }
@@ -749,10 +693,9 @@ input:focus {
   }
 
   .gift-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .gift-modal > img,
   .selected-gift img {
     min-height: 260px;
     max-height: 330px;
@@ -770,7 +713,10 @@ input:focus {
     padding-top: 22px;
   }
 
-  .gift-grid,
+  .gift-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .confirm-actions {
     grid-template-columns: 1fr;
   }
@@ -779,7 +725,6 @@ input:focus {
     padding: 10px;
   }
 
-  .modal-content,
   .selected-copy {
     padding: 24px;
   }
