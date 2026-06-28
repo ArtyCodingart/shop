@@ -25,19 +25,37 @@
           <p class="eyebrow">Скоро встречаем малыша</p>
           <h1 id="loginTitle">Выберите подарок, который хотите подарить</h1>
           <p class="login-copy">
-            Введите имя и фамилию, чтобы открыть список. После выбора подарок станет занят для остальных гостей.
+            Введите номер телефона, чтобы открыть ваш список и выбранный подарок.
           </p>
 
           <form class="login-form" id="loginForm">
             <label>
+              <span>Телефон</span>
+              <input id="phoneNumber" name="phoneNumber" type="tel" autocomplete="tel" inputmode="tel" required minlength="7" placeholder="+7 700 000 00 00">
+            </label>
+            <button type="submit">Войти к списку</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="login-view hidden" id="registerView" aria-labelledby="registerTitle">
+        <div class="login-panel">
+          <p class="eyebrow">Первый вход</p>
+          <h1 id="registerTitle">Как вас подписать?</h1>
+          <p class="login-copy">
+            Мы сохраним имя в списке, чтобы друзья видели, кто выбрал подарок.
+          </p>
+
+          <form class="login-form" id="registerForm">
+            <label>
               <span>Имя</span>
-              <input id="firstName" name="firstName" type="text" autocomplete="given-name" required minlength="2">
+              <input id="registerFirstName" name="registerFirstName" type="text" autocomplete="given-name" required minlength="2">
             </label>
             <label>
               <span>Фамилия</span>
-              <input id="lastName" name="lastName" type="text" autocomplete="family-name" required minlength="2">
+              <input id="registerLastName" name="registerLastName" type="text" autocomplete="family-name" required minlength="2">
             </label>
-            <button type="submit">Войти к списку</button>
+            <button type="submit">Сохранить и открыть список</button>
           </form>
         </div>
       </section>
@@ -91,6 +109,18 @@
         <div class="confirm-actions">
           <button class="ghost-button" id="cancelConfirmButton" type="button">Вернуться к выбору</button>
           <button class="primary-action" id="confirmGiftButton" type="button">Да, это мой подарок</button>
+        </div>
+      </article>
+    </div>
+
+    <div class="modal-backdrop hidden" id="cancelSelectionModal" role="dialog" aria-modal="true" aria-labelledby="cancelSelectionTitle">
+      <article class="confirm-dialog">
+        <p class="eyebrow">Отказ от подарка</p>
+        <h2 id="cancelSelectionTitle">Вы точно хотите отказаться?</h2>
+        <p id="cancelSelectionText">Подарок снова станет доступен другим гостям, а вы сможете выбрать другой.</p>
+        <div class="confirm-actions">
+          <button class="ghost-button" id="keepGiftButton" type="button">Оставить подарок</button>
+          <button class="danger-action" id="confirmCancelGiftButton" type="button">Да, отказаться</button>
         </div>
       </article>
     </div>

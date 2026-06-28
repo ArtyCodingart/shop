@@ -2,16 +2,29 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{phone} {
+      allow read: if true;
+      allow create, update: if
+        request.resource.data.phone == phone &&
+        request.resource.data.firstName is string &&
+        request.resource.data.lastName is string &&
+        request.resource.data.displayName is string &&
+        request.resource.data.selectedGiftId is string;
+      allow delete: if false;
+    }
+
     match /reservations/{giftId} {
       allow read: if true;
       allow create: if
         !exists(/databases/$(database)/documents/reservations/$(giftId)) &&
+        request.resource.data.phone is string &&
         request.resource.data.giftId == giftId &&
         request.resource.data.firstName is string &&
         request.resource.data.lastName is string &&
         request.resource.data.displayName is string &&
         request.resource.data.createdAt is timestamp;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if resource.data.phone is string;
     }
   }
 }

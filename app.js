@@ -1,11 +1,11 @@
-const STORAGE_PROFILE_KEY = 'babyGiftRegistry.profile';
-const STORAGE_SELECTION_KEY = 'babyGiftRegistry.selection';
+const STORAGE_PHONE_KEY = 'babyGiftRegistry.phone';
 const firebaseSettings = window.giftRegistryFirebase || { config: {}, isConfigured: false };
 
 const state = {
   booting: true,
+  phone: localStorage.getItem(STORAGE_PHONE_KEY),
+  pendingPhone: null,
   profile: null,
-  selectedGiftId: localStorage.getItem(STORAGE_SELECTION_KEY),
   giftsLoaded: false,
   reservationsLoaded: false,
   reservationsFailed: false,
@@ -14,6 +14,7 @@ const state = {
   activeGift: null,
   confirmGift: null,
   pendingReservation: false,
+  pendingCancel: false,
   firestore: null,
   firebaseReady: false,
   firebaseApi: null
@@ -22,10 +23,13 @@ const state = {
 const elements = {
   bootView: document.querySelector('#bootView'),
   loginView: document.querySelector('#loginView'),
+  registerView: document.querySelector('#registerView'),
   catalogView: document.querySelector('#catalogView'),
   loginForm: document.querySelector('#loginForm'),
-  firstName: document.querySelector('#firstName'),
-  lastName: document.querySelector('#lastName'),
+  registerForm: document.querySelector('#registerForm'),
+  phoneNumber: document.querySelector('#phoneNumber'),
+  registerFirstName: document.querySelector('#registerFirstName'),
+  registerLastName: document.querySelector('#registerLastName'),
   profileName: document.querySelector('#profileName'),
   changeProfileButton: document.querySelector('#changeProfileButton'),
   statusBanner: document.querySelector('#statusBanner'),
@@ -47,6 +51,9 @@ const elements = {
   confirmPreview: document.querySelector('#confirmPreview'),
   cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
   confirmGiftButton: document.querySelector('#confirmGiftButton'),
+  cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
+  keepGiftButton: document.querySelector('#keepGiftButton'),
+  confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
   toast: document.querySelector('#toast')
 };
 
@@ -54,20 +61,21 @@ init();
 
 async function init() {
   bindEvents();
-  restoreProfile();
-  state.booting = false;
-  render();
-
   await loadGifts();
-  render();
-
   await setupFirebase();
+
+  if (state.phone && state.firebaseReady) {
+    await loadUserByPhone(state.phone);
+  }
+
   showLocalFileHint();
+  state.booting = false;
   render();
 }
 
 function bindEvents() {
-  elements.loginForm.addEventListener('submit', handleLogin);
+  elements.loginForm.addEventListener('submit', handlePhoneLogin);
+  elements.registerForm.addEventListener('submit', createUserProfile);
   elements.changeProfileButton.addEventListener('click', clearProfile);
   elements.modalCloseButton.addEventListener('click', closeModal);
   elements.giftModal.addEventListener('click', (event) => {
@@ -83,29 +91,15 @@ function bindEvents() {
   });
   elements.cancelConfirmButton.addEventListener('click', closeConfirmModal);
   elements.confirmGiftButton.addEventListener('click', reserveConfirmedGift);
+  elements.keepGiftButton.addEventListener('click', closeCancelSelectionModal);
+  elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeModal();
       closeConfirmModal();
+      closeCancelSelectionModal();
     }
   });
-}
-
-function restoreProfile() {
-  const rawProfile = localStorage.getItem(STORAGE_PROFILE_KEY);
-
-  if (!rawProfile) {
-    return;
-  }
-
-  try {
-    const profile = JSON.parse(rawProfile);
-    if (profile.firstName && profile.lastName) {
-      state.profile = profile;
-    }
-  } catch {
-    localStorage.removeItem(STORAGE_PROFILE_KEY);
-  }
 }
 
 async function loadGifts() {
@@ -167,7 +161,7 @@ function subscribeToReservations() {
       state.reservations = new Map(snapshot.docs.map((reservationDoc) => [reservationDoc.id, reservationDoc.data()]));
       state.reservationsLoaded = true;
       state.reservationsFailed = false;
-      syncLocalSelection();
+      syncSelectedGift();
       renderGifts();
       renderSelectedGift();
       updateActiveModalState();
@@ -182,44 +176,111 @@ function subscribeToReservations() {
   );
 }
 
-function syncLocalSelection() {
-  if (!state.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
+async function handlePhoneLogin(event) {
+  event.preventDefault();
+
+  const phone = normalizePhone(elements.phoneNumber.value);
+  if (phone.length < 7) {
+    showToast('Введите номер телефона полностью.');
     return;
   }
 
-  const reservation = state.reservations.get(state.selectedGiftId);
-  if (!reservation) {
-    state.selectedGiftId = null;
-    localStorage.removeItem(STORAGE_SELECTION_KEY);
+  if (!state.firebaseReady) {
+    showToast('Подключение к Firebase еще не готово. Попробуйте обновить страницу.');
+    return;
   }
+
+  state.phone = phone;
+  localStorage.setItem(STORAGE_PHONE_KEY, phone);
+  await loadUserByPhone(phone);
+  render();
 }
 
-function handleLogin(event) {
+async function loadUserByPhone(phone) {
+  const { doc, getDoc } = state.firebaseApi;
+  const userSnapshot = await getDoc(doc(state.firestore, 'users', phone));
+
+  if (!userSnapshot.exists()) {
+    state.profile = null;
+    state.pendingPhone = phone;
+    return;
+  }
+
+  state.pendingPhone = null;
+  state.profile = normalizeUser(userSnapshot.data());
+  localStorage.setItem(STORAGE_PHONE_KEY, phone);
+  syncSelectedGift();
+}
+
+async function createUserProfile(event) {
   event.preventDefault();
 
-  const firstName = elements.firstName.value.trim();
-  const lastName = elements.lastName.value.trim();
+  if (!state.pendingPhone || !state.firebaseReady) {
+    return;
+  }
+
+  const firstName = elements.registerFirstName.value.trim();
+  const lastName = elements.registerLastName.value.trim();
 
   if (firstName.length < 2 || lastName.length < 2) {
     showToast('Введите имя и фамилию полностью.');
     return;
   }
 
-  state.profile = {
+  const { doc, serverTimestamp, setDoc } = state.firebaseApi;
+  const profile = {
+    phone: state.pendingPhone,
     firstName,
     lastName,
-    displayName: `${firstName} ${lastName}`
+    displayName: `${firstName} ${lastName}`,
+    selectedGiftId: '',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   };
 
-  localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(state.profile));
+  await setDoc(doc(state.firestore, 'users', state.pendingPhone), profile);
+  state.profile = normalizeUser(profile);
+  state.phone = state.pendingPhone;
+  state.pendingPhone = null;
+  localStorage.setItem(STORAGE_PHONE_KEY, state.phone);
+  showToast('Профиль сохранен.');
   render();
 }
 
+function normalizeUser(user) {
+  return {
+    phone: user.phone || state.phone || state.pendingPhone,
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    displayName: user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+    selectedGiftId: user.selectedGiftId || ''
+  };
+}
+
+function normalizePhone(value) {
+  return String(value).replace(/\D/g, '');
+}
+
+function syncSelectedGift() {
+  if (!state.profile || !state.profile.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
+    return;
+  }
+
+  const reservation = state.reservations.get(state.profile.selectedGiftId);
+  if (!reservation || reservation.phone !== state.profile.phone) {
+    state.profile.selectedGiftId = '';
+  }
+}
+
 function clearProfile() {
-  localStorage.removeItem(STORAGE_PROFILE_KEY);
+  localStorage.removeItem(STORAGE_PHONE_KEY);
+  state.phone = null;
+  state.pendingPhone = null;
   state.profile = null;
+  elements.phoneNumber.value = '';
   closeModal();
   closeConfirmModal();
+  closeCancelSelectionModal();
   render();
 }
 
@@ -228,17 +289,27 @@ function render() {
 
   if (state.booting) {
     elements.loginView.classList.add('hidden');
+    elements.registerView.classList.add('hidden');
+    elements.catalogView.classList.add('hidden');
+    return;
+  }
+
+  if (state.pendingPhone && !state.profile) {
+    elements.loginView.classList.add('hidden');
+    elements.registerView.classList.remove('hidden');
     elements.catalogView.classList.add('hidden');
     return;
   }
 
   if (!state.profile) {
     elements.loginView.classList.remove('hidden');
+    elements.registerView.classList.add('hidden');
     elements.catalogView.classList.add('hidden');
     return;
   }
 
   elements.loginView.classList.add('hidden');
+  elements.registerView.classList.add('hidden');
   elements.catalogView.classList.remove('hidden');
   elements.profileName.textContent = state.profile.displayName;
   renderSelectedGift();
@@ -265,9 +336,15 @@ function renderSelectedGift() {
         <strong>${escapeHtml(selectedGift.price)}</strong>
       </div>
       <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Открыть на маркетплейсе</a>
+      <div class="cancel-gift-panel">
+        <button class="soft-danger-action" id="cancelGiftButton" type="button">Передумал\`а дарить подарок</button>
+        <p>Если вы решили выбрать другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
+      </div>
     </div>
     <img src="${escapeAttribute(selectedGift.imageUrl)}" alt="${escapeAttribute(selectedGift.title)}">
   `;
+
+  document.querySelector('#cancelGiftButton').addEventListener('click', openCancelSelectionModal);
 }
 
 function renderGifts() {
@@ -286,8 +363,8 @@ function renderGifts() {
   for (const gift of state.gifts) {
     const reservation = state.reservations.get(gift.id);
     const isReserved = Boolean(reservation);
-    const userAlreadySelected = Boolean(state.selectedGiftId);
-    const isOwnSelection = state.selectedGiftId === gift.id && isReserved;
+    const userAlreadySelected = Boolean(state.profile?.selectedGiftId);
+    const isOwnSelection = state.profile?.selectedGiftId === gift.id && isReserved;
     const card = document.createElement('article');
 
     card.className = `gift-card${isReserved ? ' reserved' : ''}${isOwnSelection ? ' own-gift' : ''}`;
@@ -340,16 +417,16 @@ function isGiftActionDisabled(isReserved, isOwnSelection, userAlreadySelected) {
 }
 
 function getConfirmedSelectedGift() {
-  if (!state.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
+  if (!state.profile?.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
     return null;
   }
 
-  const reservation = state.reservations.get(state.selectedGiftId);
-  if (!reservation) {
+  const reservation = state.reservations.get(state.profile.selectedGiftId);
+  if (!reservation || reservation.phone !== state.profile.phone) {
     return null;
   }
 
-  return state.gifts.find((gift) => gift.id === state.selectedGiftId) || null;
+  return state.gifts.find((gift) => gift.id === state.profile.selectedGiftId) || null;
 }
 
 function getAvailabilityText(isReserved, reservation, isOwnSelection) {
@@ -365,7 +442,7 @@ function getAvailabilityText(isReserved, reservation, isOwnSelection) {
     return 'Бронирование временно недоступно.';
   }
 
-  if (state.selectedGiftId) {
+  if (state.profile?.selectedGiftId) {
     return 'Вы уже выбрали один подарок.';
   }
 
@@ -418,8 +495,8 @@ function updateActiveModalState() {
 
   const reservation = state.reservations.get(state.activeGift.id);
   const isReserved = Boolean(reservation);
-  const isOwnSelection = state.selectedGiftId === state.activeGift.id && isReserved;
-  const hasOtherSelection = Boolean(state.selectedGiftId) && !isOwnSelection;
+  const isOwnSelection = state.profile?.selectedGiftId === state.activeGift.id && isReserved;
+  const hasOtherSelection = Boolean(state.profile?.selectedGiftId) && !isOwnSelection;
 
   elements.reserveButton.disabled = isReserved || hasOtherSelection || !state.firebaseReady || state.reservationsFailed;
 
@@ -439,7 +516,7 @@ function updateActiveModalState() {
   }
 
   if (hasOtherSelection) {
-    elements.modalNote.textContent = 'Вы уже выбрали один подарок. Перевыбор отключен.';
+    elements.modalNote.textContent = 'Вы уже выбрали один подарок. Сначала откажитесь от текущего.';
     return;
   }
 
@@ -487,6 +564,7 @@ async function reserveConfirmedGift() {
     elements.confirmGiftButton.textContent = 'Закрепляем...';
 
     await setDoc(doc(state.firestore, 'reservations', state.confirmGift.id), {
+      phone: state.profile.phone,
       giftId: state.confirmGift.id,
       firstName: state.profile.firstName,
       lastName: state.profile.lastName,
@@ -494,8 +572,12 @@ async function reserveConfirmedGift() {
       createdAt: serverTimestamp()
     });
 
-    state.selectedGiftId = state.confirmGift.id;
-    localStorage.setItem(STORAGE_SELECTION_KEY, state.confirmGift.id);
+    await setDoc(doc(state.firestore, 'users', state.profile.phone), {
+      selectedGiftId: state.confirmGift.id,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    state.profile.selectedGiftId = state.confirmGift.id;
     showToast('Готово! Подарок закреплен за вами.');
     closeModal();
     elements.confirmModal.classList.add('hidden');
@@ -512,6 +594,56 @@ async function reserveConfirmedGift() {
     if (state.activeGift) {
       updateActiveModalState();
     }
+  }
+}
+
+function openCancelSelectionModal() {
+  if (!getConfirmedSelectedGift()) {
+    return;
+  }
+
+  elements.cancelSelectionModal.classList.remove('hidden');
+}
+
+function closeCancelSelectionModal() {
+  if (state.pendingCancel) {
+    return;
+  }
+
+  elements.cancelSelectionModal.classList.add('hidden');
+}
+
+async function cancelSelectedGift() {
+  const selectedGift = getConfirmedSelectedGift();
+  if (!selectedGift || !state.profile || !state.firestore) {
+    return;
+  }
+
+  const { deleteDoc, doc, serverTimestamp, setDoc } = state.firebaseApi;
+
+  try {
+    state.pendingCancel = true;
+    elements.confirmCancelGiftButton.disabled = true;
+    elements.confirmCancelGiftButton.textContent = 'Отказываемся...';
+
+    await deleteDoc(doc(state.firestore, 'reservations', selectedGift.id));
+    await setDoc(doc(state.firestore, 'users', state.profile.phone), {
+      selectedGiftId: '',
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    state.profile.selectedGiftId = '';
+    elements.cancelSelectionModal.classList.add('hidden');
+    showToast('Вы отказались от подарка. Теперь можно выбрать другой.');
+    renderSelectedGift();
+    renderGifts();
+  } catch (error) {
+    showToast('Не получилось отказаться от подарка. Попробуйте еще раз.');
+    console.error(error);
+  } finally {
+    state.pendingCancel = false;
+    elements.confirmCancelGiftButton.disabled = false;
+    elements.confirmCancelGiftButton.textContent = 'Да, отказаться';
   }
 }
 

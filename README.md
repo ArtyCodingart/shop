@@ -2,6 +2,8 @@
 
 Static GitHub Pages site where friends can choose one baby gift. The public gift catalog lives in `gifts.json`; shared reservations live in Firebase Firestore.
 
+Guests log in with a phone number. The app stores only that phone number in `localStorage`; names and selected gifts are loaded from Firestore user documents.
+
 ## Local Preview
 
 Do not open `index.html` directly through `file://`. Browsers restrict local module/data loading, so use a local static server:
@@ -39,6 +41,13 @@ node tests/validate-pages-workflow.mjs
 2. Create a Firestore database.
 3. Copy the web app config into `firebase-config.js`.
 4. Publish the rules from `firestore.rules`.
+
+Firestore uses:
+
+- `users/{phone}` for phone-based profiles and the selected gift id
+- `reservations/{giftId}` for the shared gift reservation state
+
+If a guest changes their mind, the app deletes their reservation and clears `selectedGiftId` on their user document.
 
 The Firebase browser config is public by design. The Firestore rules protect reservations from normal overwrite/delete actions.
 

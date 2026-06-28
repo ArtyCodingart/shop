@@ -9,11 +9,16 @@ const config = await readFile(new URL('firebase-config.js', root), 'utf8');
 const requiredHtmlSnippets = [
   'id="bootView"',
   'id="loginForm"',
+  'id="phoneNumber"',
+  'id="registerView"',
+  'id="registerForm"',
   'id="selectedGiftSection"',
   'id="giftGrid"',
   'id="giftModal"',
   'id="confirmModal"',
   'id="confirmGiftButton"',
+  'id="cancelSelectionModal"',
+  'id="confirmCancelGiftButton"',
   'id="reserveButton"',
   'defer src="./firebase-config.js"',
   'defer src="./app.js"'
@@ -26,8 +31,14 @@ for (const snippet of requiredHtmlSnippets) {
 }
 
 const requiredAppSnippets = [
-  "babyGiftRegistry.profile",
-  "babyGiftRegistry.selection",
+  "babyGiftRegistry.phone",
+  "users",
+  "normalizePhone",
+  "loadUserByPhone",
+  "createUserProfile",
+  "deleteDoc",
+  'id="cancelGiftButton"',
+  "selectedGiftId",
   'reservationsLoaded',
   'renderSkeletonCards',
   'renderSelectedGift',
@@ -48,6 +59,10 @@ if (app.includes("import { firebaseConfig, isFirebaseConfigured }")) {
 
 if (app.includes('window.confirm')) {
   throw new Error('app.js must use the custom confirmation modal instead of window.confirm');
+}
+
+if (app.includes('babyGiftRegistry.profile') || app.includes('babyGiftRegistry.selection')) {
+  throw new Error('app.js must only persist the phone number locally');
 }
 
 if (!config.includes('window.giftRegistryFirebase')) {
