@@ -349,8 +349,7 @@ input:focus {
 
 .selected-gift {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  gap: 0;
   align-items: stretch;
   margin: 0 0 28px;
   overflow: hidden;
@@ -395,18 +394,18 @@ input:focus {
   display: grid;
   gap: 8px;
   justify-items: start;
-  margin-top: 8px;
+  padding: 0 28px 28px;
 }
 
 .cancel-gift-panel p {
-  max-width: 560px;
+  max-width: 720px;
   color: #8d8276;
   font-size: 0.95rem;
 }
 
 .selected-gift img {
   width: 100%;
-  height: 100%;
+  height: min(420px, 52vw);
   min-height: 280px;
   object-fit: cover;
 }

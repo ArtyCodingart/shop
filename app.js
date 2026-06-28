@@ -368,19 +368,19 @@ function renderSelectedGift() {
   elements.selectedGiftSection.classList.remove('hidden');
   elements.selectedGiftSection.innerHTML = `
     <div class="selected-copy">
-      <p class="eyebrow">Ваш подарок выбран</p>
+      <p class="eyebrow">Вы выбрали подарок</p>
       <h2 id="selectedGiftTitle">${escapeHtml(selectedGift.title)}</h2>
-      <p>${escapeHtml(selectedGift.description)}</p>
       <div class="selected-meta">
         <span>${escapeHtml(selectedGift.category)}</span>
       </div>
-      <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Открыть магазин</a>
-      <div class="cancel-gift-panel">
-        <button class="soft-danger-action" id="cancelGiftButton" type="button">Передумал\`а покупать подарок</button>
-        <p>Если вы решили купить другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
-      </div>
+      <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Где его купить</a>
+      <p>${escapeHtml(selectedGift.description)}</p>
     </div>
     <img src="${escapeAttribute(selectedGift.imageUrl)}" alt="${escapeAttribute(selectedGift.title)}">
+    <div class="cancel-gift-panel">
+      <p>Если вы решили купить другой подарок, сначала откажитесь от текущего. После отказа подарок снова станет доступен другим гостям.</p>
+      <button class="soft-danger-action" id="cancelGiftButton" type="button">Отказаться от подарка</button>
+    </div>
   `;
 
   document.querySelector('#cancelGiftButton').addEventListener('click', openCancelSelectionModal);
