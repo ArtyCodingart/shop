@@ -82,6 +82,50 @@ img {
   min-height: 100vh;
 }
 
+.account-menu {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 15;
+}
+
+.account-trigger {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: #fffaf1;
+  background: linear-gradient(135deg, var(--cocoa), var(--caramel));
+  font-weight: 900;
+  box-shadow: 0 14px 30px rgba(92, 58, 38, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.account-trigger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 38px rgba(92, 58, 38, 0.28);
+}
+
+.account-dropdown {
+  position: absolute;
+  top: 58px;
+  right: 0;
+  min-width: 210px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 241, 0.96);
+  box-shadow: var(--shadow);
+  animation: riseIn 0.18s ease both;
+}
+
+.account-dropdown strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
 .boot-view,
 .login-view {
   min-height: 100vh;
@@ -271,7 +315,6 @@ input:focus {
   max-width: 780px;
 }
 
-.profile-card,
 .status-banner,
 .selected-gift,
 .gift-card,
@@ -281,17 +324,6 @@ input:focus {
   background: var(--panel);
   box-shadow: 0 14px 38px rgba(91, 65, 43, 0.12);
   backdrop-filter: blur(14px);
-}
-
-.profile-card {
-  min-width: 220px;
-  padding: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.profile-card span {
-  font-weight: 900;
 }
 
 .ghost-button {

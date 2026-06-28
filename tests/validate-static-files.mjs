@@ -8,6 +8,9 @@ const config = await readFile(new URL('firebase-config.js', root), 'utf8');
 
 const requiredHtmlSnippets = [
   'id="bootView"',
+  'id="accountMenu"',
+  'id="accountTrigger"',
+  'id="logoutButton"',
   'id="loginForm"',
   'id="phoneNumber"',
   'id="loginButton"',
@@ -41,6 +44,8 @@ const requiredAppSnippets = [
   "event.stopPropagation()",
   "pendingLogin",
   "pendingProfile",
+  "toggleAccountMenu",
+  "getInitials",
   'id="cancelGiftButton"',
   "selectedGiftId",
   'reservationsLoaded',

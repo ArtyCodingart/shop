@@ -33,8 +33,12 @@ const elements = {
   registerFirstName: document.querySelector('#registerFirstName'),
   registerLastName: document.querySelector('#registerLastName'),
   registerButton: document.querySelector('#registerButton'),
+  accountMenu: document.querySelector('#accountMenu'),
+  accountTrigger: document.querySelector('#accountTrigger'),
+  accountInitials: document.querySelector('#accountInitials'),
+  accountDropdown: document.querySelector('#accountDropdown'),
   profileName: document.querySelector('#profileName'),
-  changeProfileButton: document.querySelector('#changeProfileButton'),
+  logoutButton: document.querySelector('#logoutButton'),
   statusBanner: document.querySelector('#statusBanner'),
   selectedGiftSection: document.querySelector('#selectedGiftSection'),
   giftGrid: document.querySelector('#giftGrid'),
@@ -68,7 +72,9 @@ async function init() {
 function bindEvents() {
   elements.loginForm.addEventListener('submit', handlePhoneLogin);
   elements.registerForm.addEventListener('submit', createUserProfile);
-  elements.changeProfileButton.addEventListener('click', clearProfile);
+  elements.accountTrigger.addEventListener('click', toggleAccountMenu);
+  elements.logoutButton.addEventListener('click', clearProfile);
+  document.addEventListener('click', closeAccountMenuOnOutsideClick);
   elements.confirmModal.addEventListener('click', (event) => {
     if (event.target === elements.confirmModal) {
       closeConfirmModal();
@@ -294,6 +300,7 @@ function render() {
   elements.bootView.classList.toggle('hidden', !state.booting);
 
   if (state.booting) {
+    elements.accountMenu.classList.add('hidden');
     elements.loginView.classList.add('hidden');
     elements.registerView.classList.add('hidden');
     elements.catalogView.classList.add('hidden');
@@ -301,6 +308,7 @@ function render() {
   }
 
   if (state.pendingPhone && !state.profile) {
+    elements.accountMenu.classList.add('hidden');
     elements.loginView.classList.add('hidden');
     elements.registerView.classList.remove('hidden');
     elements.catalogView.classList.add('hidden');
@@ -308,6 +316,7 @@ function render() {
   }
 
   if (!state.profile) {
+    elements.accountMenu.classList.add('hidden');
     elements.loginView.classList.remove('hidden');
     elements.registerView.classList.add('hidden');
     elements.catalogView.classList.add('hidden');
@@ -318,8 +327,33 @@ function render() {
   elements.registerView.classList.add('hidden');
   elements.catalogView.classList.remove('hidden');
   elements.profileName.textContent = state.profile.displayName;
+  elements.accountInitials.textContent = getInitials(state.profile.displayName);
+  elements.accountMenu.classList.remove('hidden');
   renderSelectedGift();
   renderGifts();
+}
+
+function toggleAccountMenu(event) {
+  event.stopPropagation();
+  const isHidden = elements.accountDropdown.classList.toggle('hidden');
+  elements.accountTrigger.setAttribute('aria-expanded', String(!isHidden));
+}
+
+function closeAccountMenuOnOutsideClick(event) {
+  if (!elements.accountMenu.contains(event.target)) {
+    elements.accountDropdown.classList.add('hidden');
+    elements.accountTrigger.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function getInitials(name) {
+  return String(name)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || '?';
 }
 
 function renderSelectedGift() {

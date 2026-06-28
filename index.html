@@ -11,6 +11,16 @@
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
+    <div class="account-menu hidden" id="accountMenu">
+      <button class="account-trigger" id="accountTrigger" type="button" aria-label="Открыть меню профиля" aria-expanded="false">
+        <span id="accountInitials">?</span>
+      </button>
+      <div class="account-dropdown hidden" id="accountDropdown">
+        <strong id="profileName"></strong>
+        <button class="ghost-button" id="logoutButton" type="button">Выйти</button>
+      </div>
+    </div>
+
     <main class="app-shell">
       <section class="boot-view" id="bootView" aria-label="Загрузка">
         <div class="boot-mark">
@@ -66,10 +76,6 @@
             <p class="eyebrow">Подарки для малыша</p>
             <h1 id="catalogTitle">Малыш уже родился</h1>
             <p id="catalogSubtitle">Выберите один подарок, который хотите купить. Карточка открывает магазин, кнопка закрепляет выбор.</p>
-          </div>
-          <div class="profile-card">
-            <span id="profileName"></span>
-            <button class="ghost-button" id="changeProfileButton" type="button">Сменить телефон</button>
           </div>
         </header>
 
