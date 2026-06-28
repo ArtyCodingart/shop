@@ -29,6 +29,8 @@ Validate after editing:
 
 ```bash
 node tests/validate-gifts.mjs
+node tests/validate-static-files.mjs
+node tests/validate-pages-workflow.mjs
 ```
 
 ## Firebase Setup
@@ -46,8 +48,7 @@ Push the repository to GitHub, then enable GitHub Pages:
 
 1. Open repository settings.
 2. Go to Pages.
-3. Source: Deploy from a branch.
-4. Branch: `main`.
-5. Folder: `/ (root)`.
+3. Source: GitHub Actions.
+4. Push to `main` or run the `Deploy static site to GitHub Pages` workflow manually.
 
 After GitHub publishes the page, share the Pages URL with friends.
