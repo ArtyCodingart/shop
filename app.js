@@ -12,6 +12,7 @@ const state = {
   gifts: [],
   reservations: new Map(),
   confirmGift: null,
+  switchGift: null,
   pendingLogin: false,
   pendingProfile: false,
   pendingReservation: false,
@@ -47,6 +48,11 @@ const elements = {
   confirmPreview: document.querySelector('#confirmPreview'),
   cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
   confirmGiftButton: document.querySelector('#confirmGiftButton'),
+  switchChoiceModal: document.querySelector('#switchChoiceModal'),
+  switchChoiceText: document.querySelector('#switchChoiceText'),
+  switchChoicePreview: document.querySelector('#switchChoicePreview'),
+  keepCurrentGiftButton: document.querySelector('#keepCurrentGiftButton'),
+  goToCancelGiftButton: document.querySelector('#goToCancelGiftButton'),
   cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
   keepGiftButton: document.querySelector('#keepGiftButton'),
   confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
@@ -82,11 +88,19 @@ function bindEvents() {
   });
   elements.cancelConfirmButton.addEventListener('click', closeConfirmModal);
   elements.confirmGiftButton.addEventListener('click', reserveConfirmedGift);
+  elements.switchChoiceModal.addEventListener('click', (event) => {
+    if (event.target === elements.switchChoiceModal) {
+      closeSwitchChoiceModal();
+    }
+  });
+  elements.keepCurrentGiftButton.addEventListener('click', closeSwitchChoiceModal);
+  elements.goToCancelGiftButton.addEventListener('click', moveFromSwitchToCancel);
   elements.keepGiftButton.addEventListener('click', closeCancelSelectionModal);
   elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeConfirmModal();
+      closeSwitchChoiceModal();
       closeCancelSelectionModal();
     }
   });
@@ -292,6 +306,7 @@ function clearProfile() {
   state.profile = null;
   elements.phoneNumber.value = '';
   closeConfirmModal();
+  closeSwitchChoiceModal();
   closeCancelSelectionModal();
   render();
 }
@@ -434,6 +449,11 @@ function renderGifts() {
     });
     button.addEventListener('click', (event) => {
       event.stopPropagation();
+      if (userAlreadySelected && !isOwnSelection && !isReserved) {
+        openSwitchChoiceModal(gift);
+        return;
+      }
+
       openConfirmModal(gift);
     });
     elements.giftGrid.append(card);
@@ -466,8 +486,8 @@ function renderSkeletonCards() {
   }
 }
 
-function isGiftActionDisabled(isReserved, isOwnSelection, userAlreadySelected) {
-  return !state.firebaseReady || state.reservationsFailed || isReserved || (userAlreadySelected && !isOwnSelection);
+function isGiftActionDisabled(isReserved) {
+  return !state.firebaseReady || state.reservationsFailed || isReserved;
 }
 
 function getConfirmedSelectedGift() {
@@ -512,10 +532,6 @@ function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
     return 'Уже купят';
   }
 
-  if (userAlreadySelected) {
-    return 'Уже есть выбор';
-  }
-
   if (!state.firebaseReady || state.reservationsFailed) {
     return 'Загрузка статуса';
   }
@@ -549,6 +565,35 @@ function closeConfirmModal() {
 
   elements.confirmModal.classList.add('hidden');
   state.confirmGift = null;
+}
+
+function openSwitchChoiceModal(gift) {
+  const selectedGift = getConfirmedSelectedGift();
+
+  if (!gift || !selectedGift) {
+    return;
+  }
+
+  state.switchGift = gift;
+  elements.switchChoiceText.textContent = `Сейчас за вами закреплен подарок «${selectedGift.title}». Если вы хотите выбрать «${gift.title}», сначала нужно отказаться от текущего подарка. После отказа он снова станет доступен другим гостям, а новый подарок нужно будет подтвердить отдельным нажатием.`;
+  elements.switchChoicePreview.innerHTML = `
+    <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}">
+    <div>
+      <strong>${escapeHtml(gift.title)}</strong>
+      <span>${escapeHtml(gift.description)}</span>
+    </div>
+  `;
+  elements.switchChoiceModal.classList.remove('hidden');
+}
+
+function closeSwitchChoiceModal() {
+  elements.switchChoiceModal.classList.add('hidden');
+  state.switchGift = null;
+}
+
+function moveFromSwitchToCancel() {
+  closeSwitchChoiceModal();
+  openCancelSelectionModal();
 }
 
 async function reserveConfirmedGift() {

@@ -21,6 +21,8 @@ const requiredHtmlSnippets = [
   'id="giftGrid"',
   'id="confirmModal"',
   'id="confirmGiftButton"',
+  'id="switchChoiceModal"',
+  'id="goToCancelGiftButton"',
   'id="cancelSelectionModal"',
   'id="confirmCancelGiftButton"',
   'defer src="./firebase-config.js"',
@@ -41,6 +43,8 @@ const requiredAppSnippets = [
   "createUserProfile",
   "deleteDoc",
   "openMarketLink",
+  "openSwitchChoiceModal",
+  "moveFromSwitchToCancel",
   "event.stopPropagation()",
   "pendingLogin",
   "pendingProfile",
@@ -68,6 +72,10 @@ if (app.includes("import { firebaseConfig, isFirebaseConfigured }")) {
 
 if (app.includes('window.confirm')) {
   throw new Error('app.js must use the custom confirmation modal instead of window.confirm');
+}
+
+if (app.includes('Уже есть выбор')) {
+  throw new Error('gift action must stay available and open the switch choice modal after a gift was selected');
 }
 
 if (html.includes('id="giftModal"') || app.includes('giftModal') || app.includes('openModal')) {
