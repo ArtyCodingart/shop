@@ -25,9 +25,7 @@ const requiredHtmlSnippets = [
   'id="switchChoiceModal"',
   'id="goToCancelGiftButton"',
   'id="cancelSelectionModal"',
-  'id="confirmCancelGiftButton"',
-  'defer src="./firebase-config.js"',
-  'defer src="./app.js"'
+  'id="confirmCancelGiftButton"'
 ];
 
 for (const snippet of requiredHtmlSnippets) {
@@ -36,14 +34,20 @@ for (const snippet of requiredHtmlSnippets) {
   }
 }
 
-const coreScript = 'defer src="./registry-core.js"';
-const appScript = 'defer src="./app.js"';
+const scriptSources = Array.from(
+  html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi),
+  (match) => match[1]
+);
+const coreScript = './registry-core.js';
+const appScript = './app.js';
 
-if (!html.includes(coreScript)) {
-  throw new Error(`index.html missing ${coreScript}`);
+for (const scriptSource of ['./firebase-config.js', coreScript, appScript]) {
+  if (!scriptSources.includes(scriptSource)) {
+    throw new Error(`index.html missing script source ${scriptSource}`);
+  }
 }
 
-if (html.indexOf(coreScript) > html.indexOf(appScript)) {
+if (scriptSources.indexOf(coreScript) > scriptSources.indexOf(appScript)) {
   throw new Error('registry-core.js must load before app.js');
 }
 

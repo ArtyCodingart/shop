@@ -3,9 +3,9 @@
 
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
+  } else {
+    root.giftRegistryCore = api;
   }
-
-  root.giftRegistryCore = api;
 })(typeof globalThis === 'object' ? globalThis : window, () => {
   function getReservationState(reservation, phone) {
     if (!reservation) {
