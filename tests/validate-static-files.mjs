@@ -7,6 +7,19 @@ const app = await readFile(new URL('app.js', root), 'utf8');
 const styles = await readFile(new URL('styles.css', root), 'utf8');
 const config = await readFile(new URL('firebase-config.js', root), 'utf8');
 const core = await readFile(new URL('registry-core.js', root), 'utf8');
+const readme = await readFile(new URL('README.md', root), 'utf8');
+
+for (const snippet of [
+  'choose multiple baby gifts',
+  'reservations/{giftId}',
+  'source of truth',
+  'node --test tests/task3-behavior.test.cjs',
+  'node --test tests/registry-core.test.cjs'
+]) {
+  if (!readme.includes(snippet)) {
+    throw new Error(`README.md missing ${snippet}`);
+  }
+}
 
 for (const forbiddenSnippet of [
   'switchChoiceModal',

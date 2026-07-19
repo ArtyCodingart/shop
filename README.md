@@ -1,8 +1,8 @@
 # Baby Gift Registry
 
-Static GitHub Pages site where friends can choose one baby gift. The public gift catalog lives in `gifts.json`; shared reservations live in Firebase Firestore.
+Static GitHub Pages site where friends can choose multiple baby gifts. The public gift catalog lives in `gifts.json`; shared reservations live in Firebase Firestore.
 
-Guests log in with a phone number. The app stores only that phone number in `localStorage`; names and selected gifts are loaded from Firestore user documents.
+Guests log in with a phone number. The app stores only that phone number in `localStorage`; names are loaded from Firestore user documents, while `reservations/{giftId}` is the source of truth for every selected gift. A guest can release one reservation without affecting their other gifts.
 
 ## Local Preview
 
@@ -30,6 +30,8 @@ Update `gifts.json`. Each gift needs:
 Validate after editing:
 
 ```bash
+node --test tests/task3-behavior.test.cjs
+node --test tests/registry-core.test.cjs
 node tests/validate-gifts.mjs
 node tests/validate-static-files.mjs
 node tests/validate-pages-workflow.mjs
@@ -44,10 +46,10 @@ node tests/validate-pages-workflow.mjs
 
 Firestore uses:
 
-- `users/{phone}` for phone-based profiles and the selected gift id
-- `reservations/{giftId}` for the shared gift reservation state
+- `users/{phone}` for phone-based profiles; the legacy empty `selectedGiftId` remains only for deployed-rule compatibility
+- `reservations/{giftId}` as the source of truth for shared gift reservation state
 
-If a guest changes their mind, the app deletes their reservation and clears `selectedGiftId` on their user document.
+A phone may own any number of reservation documents. Cancelling a gift deletes only its reservation.
 
 The Firebase browser config is public by design. The Firestore rules protect reservations from normal overwrite/delete actions.
 
