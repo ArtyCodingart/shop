@@ -18,6 +18,7 @@ const requiredHtmlSnippets = [
   'id="registerView"',
   'id="registerForm"',
   'id="registerButton"',
+  'class="selected-gift selected-gifts hidden"',
   'id="selectedGiftSection"',
   'id="selectedGiftTitle"',
   'id="selectedGiftGrid"',
@@ -60,8 +61,16 @@ for (const snippet of requiredHtmlSnippets) {
   }
 }
 
-if (html.indexOf('id="handoffModal"') < html.indexOf('id="confirmModal"')) {
+const confirmModalIndex = html.indexOf('id="confirmModal"');
+const handoffModalIndex = html.indexOf('id="handoffModal"');
+const switchChoiceModalIndex = html.indexOf('id="switchChoiceModal"');
+
+if (confirmModalIndex >= handoffModalIndex) {
   throw new Error('handoffModal must follow confirmModal');
+}
+
+if (handoffModalIndex >= switchChoiceModalIndex) {
+  throw new Error('switchChoiceModal must follow handoffModal');
 }
 
 const scriptSources = Array.from(
