@@ -5,6 +5,7 @@ const root = new URL('../', import.meta.url);
 const html = await readFile(new URL('index.html', root), 'utf8');
 const app = await readFile(new URL('app.js', root), 'utf8');
 const config = await readFile(new URL('firebase-config.js', root), 'utf8');
+const core = await readFile(new URL('registry-core.js', root), 'utf8');
 
 const requiredHtmlSnippets = [
   'id="bootView"',
@@ -32,6 +33,23 @@ const requiredHtmlSnippets = [
 for (const snippet of requiredHtmlSnippets) {
   if (!html.includes(snippet)) {
     throw new Error(`index.html missing ${snippet}`);
+  }
+}
+
+const coreScript = 'defer src="./registry-core.js"';
+const appScript = 'defer src="./app.js"';
+
+if (!html.includes(coreScript)) {
+  throw new Error(`index.html missing ${coreScript}`);
+}
+
+if (html.indexOf(coreScript) > html.indexOf(appScript)) {
+  throw new Error('registry-core.js must load before app.js');
+}
+
+for (const snippet of ['getReservationState', 'getOwnedGifts', 'giftRegistryCore']) {
+  if (!core.includes(snippet)) {
+    throw new Error(`registry-core.js missing ${snippet}`);
   }
 }
 
