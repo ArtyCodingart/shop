@@ -19,12 +19,22 @@ const requiredHtmlSnippets = [
   'id="registerForm"',
   'id="registerButton"',
   'id="selectedGiftSection"',
+  'id="selectedGiftGrid"',
+  'Ваши подарки',
   'id="giftGrid"',
   'id="confirmModal"',
   'id="confirmGiftButton"',
+  'Хотите купить этот подарок?',
+  'id="handoffModal"',
+  'id="handoffPreview"',
+  'id="handoffStatus"',
+  'id="handoffBackButton"',
+  'id="handoffConfirmButton"',
+  'Как это работает',
   'id="switchChoiceModal"',
   'id="goToCancelGiftButton"',
   'id="cancelSelectionModal"',
+  'id="cancelSelectionText"',
   'id="confirmCancelGiftButton"'
 ];
 
@@ -32,6 +42,10 @@ for (const snippet of requiredHtmlSnippets) {
   if (!html.includes(snippet)) {
     throw new Error(`index.html missing ${snippet}`);
   }
+}
+
+if (html.indexOf('id="handoffModal"') < html.indexOf('id="confirmModal"')) {
+  throw new Error('handoffModal must follow confirmModal');
 }
 
 const scriptSources = Array.from(
