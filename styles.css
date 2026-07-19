@@ -386,16 +386,37 @@ input:focus {
 .gift-card {
   min-height: 100%;
   display: grid;
-  grid-template-rows: 168px 1fr;
+  grid-template-rows: 1fr auto;
   overflow: hidden;
   animation: cardIn 0.45s ease both;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.gift-card:hover:not(.skeleton-card):not(.unavailable-gift) {
+  transform: translateY(-5px);
+  box-shadow: 0 22px 48px rgba(91, 65, 43, 0.18);
+}
+
+.gift-card-main {
+  width: 100%;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: 168px 1fr;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
 }
 
-.gift-card:hover:not(.skeleton-card) {
-  transform: translateY(-5px);
-  box-shadow: 0 22px 48px rgba(91, 65, 43, 0.18);
+.gift-card-main:disabled,
+.unavailable-gift {
+  cursor: default;
+}
+
+.skeleton-card {
+  grid-template-rows: 168px 1fr;
 }
 
 .gift-card.reserved {
@@ -448,6 +469,10 @@ input:focus {
 
 .gift-action {
   min-height: 40px;
+  width: calc(100% - 24px);
+  margin-right: 12px;
+  margin-bottom: 12px;
+  margin-left: 12px;
   margin-top: auto;
   border: 0;
   border-radius: 7px;

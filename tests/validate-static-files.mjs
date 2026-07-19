@@ -39,6 +39,7 @@ const requiredHtmlSnippets = [
   'id="selectedGiftGrid"',
   'Ваши подарки',
   'Вы планируете купить эти подарки. Нажмите на карточку, чтобы перейти в магазин.',
+  'id="giftListTitle" tabindex="-1"',
   'id="giftGrid"',
   'Выберите подарки, которые хотите купить. Свободная карточка сначала покажет подтверждение.',
   'id="confirmModal"',
@@ -98,7 +99,7 @@ if (scriptSources.indexOf(coreScript) > scriptSources.indexOf(appScript)) {
   throw new Error('registry-core.js must load before app.js');
 }
 
-for (const snippet of ['getReservationState', 'getOwnedGifts', 'giftRegistryCore']) {
+for (const snippet of ['deleteOwnedReservation', 'transaction.delete(reservationRef)', 'getReservationState', 'getOwnedGifts', 'giftRegistryCore']) {
   if (!core.includes(snippet)) {
     throw new Error(`registry-core.js missing ${snippet}`);
   }
@@ -116,11 +117,18 @@ const requiredAppSnippets = [
   "getReservationState",
   "renderSelectedGifts",
   "createGiftCard",
+  "gift-card-main",
+  "status.textContent = availabilityText",
+  "mainControl.addEventListener('click'",
+  "action.addEventListener('click'",
   "state.cancelGift",
+  "state.cancelGiftId",
   "openCancelSelectionModal(gift",
+  "finishCancelSelection",
+  "trapCancelSelectionFocus",
+  "restoreCancelSelectionFocus",
+  "deleteOwnedReservation",
   "runTransaction",
-  "transaction.delete(reservationRef)",
-  "event.stopPropagation()",
   "pendingLogin",
   "pendingProfile",
   "toggleAccountMenu",
@@ -148,12 +156,25 @@ if (app.includes('window.confirm')) {
 }
 
 if (app.includes('Уже есть выбор')) {
-  throw new Error('gift action must stay available and open the switch choice modal after a gift was selected');
+  throw new Error('gift action must stay available for additional selections');
+}
+
+for (const forbiddenCardHandler of ["card.addEventListener('click'", "card.addEventListener('keydown'", "card.setAttribute('role'", 'card.tabIndex']) {
+  if (app.includes(forbiddenCardHandler)) {
+    throw new Error(`gift cards must use sibling native controls; found ${forbiddenCardHandler}`);
+  }
+}
+
+if (app.includes('<p class="gift-status">${')) {
+  throw new Error('reservation status must be assigned with textContent, not interpolated into markup');
 }
 
 for (const styleSnippet of [
   '.selected-gifts',
   '.selected-gift-grid',
+  '.gift-card-main',
+  '.unavailable-gift',
+  ':not(.unavailable-gift)',
   'flex-direction: column',
   'margin-top: auto'
 ]) {

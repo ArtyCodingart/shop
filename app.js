@@ -1,6 +1,6 @@
 const STORAGE_PHONE_KEY = 'babyGiftRegistry.phone';
 const firebaseSettings = window.giftRegistryFirebase || { config: {}, isConfigured: false };
-const { getOwnedGifts, getReservationState } = window.giftRegistryCore;
+const { deleteOwnedReservation, getOwnedGifts, getReservationState } = window.giftRegistryCore;
 const GIFT_NOT_OWNED = 'gift-not-owned';
 
 const state = {
@@ -15,6 +15,7 @@ const state = {
   reservations: new Map(),
   confirmGift: null,
   cancelGift: null,
+  cancelGiftId: null,
   cancelTrigger: null,
   pendingLogin: false,
   pendingProfile: false,
@@ -46,6 +47,7 @@ const elements = {
   statusBanner: document.querySelector('#statusBanner'),
   selectedGiftSection: document.querySelector('#selectedGiftSection'),
   selectedGiftGrid: document.querySelector('#selectedGiftGrid'),
+  giftListTitle: document.querySelector('#giftListTitle'),
   giftGrid: document.querySelector('#giftGrid'),
   confirmModal: document.querySelector('#confirmModal'),
   confirmText: document.querySelector('#confirmText'),
@@ -93,6 +95,7 @@ function bindEvents() {
   elements.cancelSelectionModal.addEventListener('click', (event) => {
     if (event.target === elements.cancelSelectionModal) closeCancelSelectionModal();
   });
+  elements.cancelSelectionModal.addEventListener('keydown', trapCancelSelectionFocus);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeConfirmModal();
@@ -391,49 +394,63 @@ function createGiftCard(gift, context) {
   const reservationState = getReservationState(reservation, state.profile?.phone);
   const isSelectedCard = context === 'selected';
   const isUnavailable = !state.firebaseReady || state.reservationsFailed || reservationState === 'reserved';
+  const isDisabled = isUnavailable && reservationState !== 'own';
   const card = document.createElement('article');
-  const cardAction = isSelectedCard || reservationState === 'own' ? 'market' : 'select';
+  const mainControl = document.createElement('button');
+  const image = document.createElement('img');
+  const body = document.createElement('div');
+  const topline = document.createElement('div');
+  const category = document.createElement('span');
+  const title = document.createElement('h2');
+  const description = document.createElement('p');
+  const action = document.createElement('button');
+  const availabilityText = getAvailabilityText(reservationState, reservation, isSelectedCard);
 
-  card.className = `gift-card${reservationState !== 'free' ? ' reserved' : ''}${reservationState === 'own' ? ' own-gift' : ''}${isSelectedCard ? ' selected-gift-card' : ''}`;
-  card.tabIndex = isUnavailable && reservationState !== 'own' ? -1 : 0;
-  card.setAttribute('role', isUnavailable && reservationState !== 'own' ? 'group' : cardAction === 'market' ? 'link' : 'button');
-  card.setAttribute('aria-label', getCardAriaLabel(gift, reservationState, isUnavailable));
-  card.innerHTML = `
-    <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}" loading="lazy">
-    <div class="gift-body">
-      <div class="gift-topline"><span>${escapeHtml(gift.category)}</span></div>
-      <h2>${escapeHtml(gift.title)}</h2>
-      <p>${escapeHtml(gift.description)}</p>
-      ${getAvailabilityText(reservationState, reservation, isSelectedCard) ? `<p class="gift-status">${getAvailabilityText(reservationState, reservation, isSelectedCard)}</p>` : ''}
-      <button class="gift-action${isSelectedCard ? ' cancel-gift-action' : ''}" type="button" ${isUnavailable && !isSelectedCard && reservationState !== 'own' ? 'disabled' : ''}>
-        ${getActionText(reservationState, isSelectedCard)}
-      </button>
-    </div>
-  `;
+  card.className = `gift-card${reservationState !== 'free' ? ' reserved' : ''}${reservationState === 'own' ? ' own-gift' : ''}${isSelectedCard ? ' selected-gift-card' : ''}${isDisabled ? ' unavailable-gift' : ''}`;
+  card.dataset.giftId = gift.id;
+  mainControl.className = 'gift-card-main';
+  mainControl.type = 'button';
+  mainControl.disabled = isDisabled;
+  mainControl.setAttribute('aria-label', getCardAriaLabel(gift, reservationState, isUnavailable));
+  image.src = gift.imageUrl;
+  image.alt = gift.title;
+  image.loading = 'lazy';
+  body.className = 'gift-body';
+  topline.className = 'gift-topline';
+  category.textContent = gift.category;
+  title.textContent = gift.title;
+  description.textContent = gift.description;
+  action.className = `gift-action${isSelectedCard ? ' cancel-gift-action' : ''}`;
+  action.type = 'button';
+  action.disabled = isDisabled;
+  action.textContent = getActionText(reservationState, isSelectedCard);
+  action.setAttribute('aria-label', getActionAriaLabel(gift, reservationState, isSelectedCard, isUnavailable));
 
-  const button = card.querySelector('button');
-  const activateCard = () => {
+  topline.append(category);
+  body.append(topline, title, description);
+  if (availabilityText) {
+    const status = document.createElement('p');
+    status.className = 'gift-status';
+    status.textContent = availabilityText;
+    body.append(status);
+  }
+  mainControl.append(image, body);
+  card.append(mainControl, action);
+
+  const activateMain = () => {
     if (isSelectedCard || reservationState === 'own') {
       openMarketLink(gift);
     } else if (!isUnavailable) {
-      openConfirmModal(gift, card);
+      openConfirmModal(gift, mainControl);
     }
   };
 
-  card.addEventListener('click', activateCard);
-  card.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      activateCard();
-    }
-  });
-  button.addEventListener('click', (event) => {
-    event.stopPropagation();
-
+  mainControl.addEventListener('click', activateMain);
+  action.addEventListener('click', () => {
     if (isSelectedCard) {
-      openCancelSelectionModal(gift, button);
+      openCancelSelectionModal(gift, action);
     } else {
-      activateCard();
+      activateMain();
     }
   });
 
@@ -460,6 +477,11 @@ function getCardAriaLabel(gift, reservationState, isUnavailable) {
   if (reservationState === 'own') return `Открыть магазин: ${gift.title}`;
   if (isUnavailable) return `Подарок недоступен: ${gift.title}`;
   return `Выбрать подарок: ${gift.title}`;
+}
+
+function getActionAriaLabel(gift, reservationState, isSelectedCard, isUnavailable) {
+  if (isSelectedCard) return `Отказаться от подарка: ${gift.title}`;
+  return getCardAriaLabel(gift, reservationState, isUnavailable);
 }
 
 function openMarketLink(gift) {
@@ -558,21 +580,65 @@ function openCancelSelectionModal(gift, trigger) {
   }
 
   state.cancelGift = gift;
+  state.cancelGiftId = gift.id;
   state.cancelTrigger = trigger;
   elements.cancelSelectionText.textContent = `Подарок «${gift.title}» снова станет доступен другим гостям. Остальные ваши подарки сохранятся.`;
   elements.cancelSelectionModal.classList.remove('hidden');
+  elements.keepGiftButton.focus();
 }
 
 function closeCancelSelectionModal() {
-  if (state.pendingCancel) {
+  if (state.pendingCancel) return;
+
+  finishCancelSelection();
+}
+
+function trapCancelSelectionFocus(event) {
+  if (event.key !== 'Tab' || elements.cancelSelectionModal.classList.contains('hidden')) return;
+
+  const controls = Array.from(elements.cancelSelectionModal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+  if (controls.length === 0) return;
+
+  const firstControl = controls[0];
+  const lastControl = controls[controls.length - 1];
+  if (event.shiftKey && document.activeElement === firstControl) {
+    event.preventDefault();
+    lastControl.focus();
+  } else if (!event.shiftKey && document.activeElement === lastControl) {
+    event.preventDefault();
+    firstControl.focus();
+  }
+}
+
+function finishCancelSelection({ rerender = false } = {}) {
+  const giftId = state.cancelGiftId;
+  const trigger = state.cancelTrigger;
+
+  elements.cancelSelectionModal.classList.add('hidden');
+  state.cancelGift = null;
+  state.cancelGiftId = null;
+  state.cancelTrigger = null;
+  if (rerender) {
+    renderSelectedGifts();
+    renderGifts();
+  }
+  restoreCancelSelectionFocus(giftId, trigger);
+}
+
+function restoreCancelSelectionFocus(giftId, trigger) {
+  if (trigger?.isConnected && !trigger.disabled) {
+    trigger.focus();
     return;
   }
 
-  elements.cancelSelectionModal.classList.add('hidden');
-  const trigger = state.cancelTrigger;
-  state.cancelGift = null;
-  state.cancelTrigger = null;
-  if (trigger?.isConnected) trigger.focus();
+  const catalogCard = Array.from(elements.giftGrid.children).find((card) => card.dataset.giftId === giftId);
+  const catalogMain = catalogCard?.querySelector('.gift-card-main');
+  if (catalogMain && !catalogMain.disabled) {
+    catalogMain.focus();
+    return;
+  }
+
+  elements.giftListTitle.focus();
 }
 
 async function cancelSelectedGift() {
@@ -588,43 +654,33 @@ async function cancelSelectedGift() {
     elements.confirmCancelGiftButton.disabled = true;
     elements.confirmCancelGiftButton.textContent = 'Отказываемся…';
 
-    await runTransaction(state.firestore, async (transaction) => {
-      const snapshot = await transaction.get(reservationRef);
-      if (!snapshot.exists() || snapshot.data().phone !== state.profile.phone) {
-        const error = new Error('Gift is not reserved by this profile');
-        error.code = GIFT_NOT_OWNED;
-        error.reservation = snapshot.exists() ? snapshot.data() : null;
-        throw error;
-      }
-      transaction.delete(reservationRef);
+    await deleteOwnedReservation({
+      firestore: state.firestore,
+      reservationRef,
+      phone: state.profile.phone,
+      runTransaction
     });
 
     state.reservations.delete(gift.id);
-    elements.cancelSelectionModal.classList.add('hidden');
-    state.cancelGift = null;
-    state.cancelTrigger = null;
+    finishCancelSelection({ rerender: true });
     showToast('Вы отказались от одного подарка. Остальные ваши подарки сохранены.');
-    renderSelectedGifts();
-    renderGifts();
   } catch (error) {
     if (error.code === GIFT_NOT_OWNED) {
       if (error.reservation) state.reservations.set(gift.id, error.reservation);
       else state.reservations.delete(gift.id);
-      elements.cancelSelectionModal.classList.add('hidden');
-      state.cancelGift = null;
-      state.cancelTrigger = null;
-      renderSelectedGifts();
-      renderGifts();
+      finishCancelSelection({ rerender: true });
       showToast('Этот подарок больше не закреплён за вашим профилем.');
     } else {
       showToast('Не получилось отказаться от подарка. Попробуйте ещё раз.');
       console.error(error);
     }
   } finally {
+    const shouldFocusRetry = Boolean(state.cancelGift) && !elements.cancelSelectionModal.classList.contains('hidden');
     state.pendingCancel = false;
     elements.keepGiftButton.disabled = false;
     elements.confirmCancelGiftButton.disabled = false;
     elements.confirmCancelGiftButton.textContent = 'Да, отказаться';
+    if (shouldFocusRetry) elements.confirmCancelGiftButton.focus();
   }
 }
 
