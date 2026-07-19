@@ -205,6 +205,7 @@ function createEvent(type, values = {}) {
 
 function createFakeDocument() {
   const elements = new Map();
+  const listeners = new Map();
   const document = {
     activeElement: null,
     createElement(tagName) {
@@ -214,51 +215,107 @@ function createFakeDocument() {
       if (!elements.has(selector)) elements.set(selector, new FakeElement('div', document));
       return elements.get(selector);
     },
-    addEventListener() {}
+    addEventListener(type, listener) {
+      const registered = listeners.get(type) || [];
+      registered.push(listener);
+      listeners.set(type, registered);
+    },
+    dispatchEvent(event) {
+      if (!event.target) event.target = document;
+      event.currentTarget = document;
+      for (const listener of listeners.get(event.type) || []) listener(event);
+      return !event.defaultPrevented;
+    }
   };
 
   for (const selector of [
-    '#loginForm', '#registerForm', '#accountTrigger', '#logoutButton', '#confirmModal',
-    '#cancelConfirmButton', '#confirmGiftButton', '#cancelSelectionModal', '#cancelSelectionDialog', '#keepGiftButton',
+    '#loginForm', '#registerForm', '#accountTrigger', '#logoutButton', '#confirmModal', '#confirmDialog',
+    '#cancelConfirmButton', '#confirmGiftButton', '#handoffModal', '#handoffDialog', '#handoffBackButton',
+    '#handoffConfirmButton', '#cancelSelectionModal', '#cancelSelectionDialog', '#keepGiftButton',
     '#confirmCancelGiftButton'
   ]) {
     const tagName = selector.includes('Form') ? 'form' : selector.includes('Dialog') ? 'article' : selector.includes('Modal') ? 'div' : 'button';
     elements.set(selector, new FakeElement(tagName, document));
   }
 
+  const confirmModal = elements.get('#confirmModal');
+  const confirmDialog = elements.get('#confirmDialog');
+  confirmDialog.append(elements.get('#cancelConfirmButton'), elements.get('#confirmGiftButton'));
+  confirmModal.append(confirmDialog);
+  confirmModal.classList.add('hidden');
+
+  const handoffModal = elements.get('#handoffModal');
+  const handoffDialog = elements.get('#handoffDialog');
+  handoffDialog.append(elements.get('#handoffBackButton'), elements.get('#handoffConfirmButton'));
+  handoffModal.append(handoffDialog);
+  handoffModal.classList.add('hidden');
+
   const cancelModal = elements.get('#cancelSelectionModal');
   const cancelDialog = elements.get('#cancelSelectionDialog');
   cancelDialog.append(elements.get('#keepGiftButton'), elements.get('#confirmCancelGiftButton'));
   cancelModal.append(cancelDialog);
+  cancelModal.classList.add('hidden');
+  document.querySelector('#handoffStatus').classList.add('hidden');
   return document;
 }
 
 function loadApp() {
   const document = createFakeDocument();
   let marketOpenCount = 0;
+  const marketAssignments = [];
+  const timers = [];
   const sandbox = {
     console: { error() {} },
     document,
     localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
-    location: { protocol: 'https:' },
+    location: {
+      protocol: 'https:',
+      assign(url) { marketAssignments.push(url); }
+    },
     giftRegistryFirebase: { config: {}, isConfigured: false },
     giftRegistryCore: registryCore,
     open() { marketOpenCount += 1; },
     clearTimeout() {},
-    setTimeout() { return 1; }
+    setTimeout(callback, delay) {
+      const timer = { callback, delay, cleared: false };
+      timers.push(timer);
+      return timers.length;
+    }
   };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
   const source = readFileSync(require.resolve('../app.js'), 'utf8')
     .replace('\ninit();\n', '\n')
-    + '\n;globalThis.__appTest = { state, elements, bindEvents, createGiftCard, openCancelSelectionModal, closeCancelSelectionModal, cancelSelectedGift };';
+    + `\n;globalThis.__appTest = {
+      state,
+      elements,
+      bindEvents,
+      createGiftCard,
+      openConfirmModal,
+      closeConfirmModal,
+      openHandoffModal: typeof openHandoffModal === 'function' ? openHandoffModal : undefined,
+      returnToConfirmModal: typeof returnToConfirmModal === 'function' ? returnToConfirmModal : undefined,
+      closeHandoffModal: typeof closeHandoffModal === 'function' ? closeHandoffModal : undefined,
+      reserveAndOpenMarketplace: typeof reserveAndOpenMarketplace === 'function' ? reserveAndOpenMarketplace : undefined,
+      openCancelSelectionModal,
+      closeCancelSelectionModal,
+      cancelSelectedGift
+    };`;
   vm.runInContext(source, context);
   context.__appTest.bindEvents();
 
   return {
     ...context.__appTest,
     document,
-    getMarketOpenCount: () => marketOpenCount
+    getMarketOpenCount: () => marketOpenCount + marketAssignments.length,
+    getMarketAssignments: () => [...marketAssignments],
+    getTimers: () => timers.filter((timer) => !timer.cleared),
+    runTimer(delay) {
+      const timer = timers.find((candidate) => !candidate.cleared && candidate.delay === delay);
+      assert.ok(timer, `expected a pending ${delay} ms timer`);
+      timer.cleared = true;
+      timer.callback();
+    }
   };
 }
 
@@ -285,6 +342,26 @@ function prepareOwnedCard(app) {
   const card = app.createGiftCard(selectedGift, 'selected');
   app.elements.selectedGiftGrid.append(card);
   return { selectedGift, card };
+}
+
+function prepareFreeCard(app, overrides = {}) {
+  const freeGift = gift(overrides);
+  app.state.profile = {
+    phone: '77000000000',
+    firstName: 'Тест',
+    lastName: 'Гость',
+    displayName: 'Тест Гость'
+  };
+  app.state.firebaseReady = true;
+  app.state.reservationsLoaded = true;
+  app.state.reservationsFailed = false;
+  app.state.firestore = {};
+  app.state.gifts = [freeGift];
+  app.state.giftsLoaded = true;
+  app.state.reservations = new Map();
+  const card = app.createGiftCard(freeGift, 'catalog');
+  app.elements.giftGrid.append(card);
+  return { freeGift, card };
 }
 
 test('renders a hostile reservation display name as text, never markup', () => {
@@ -471,6 +548,297 @@ test('pending cancellation focuses a busy dialog and traps Tab until the transac
   assert.equal(app.document.activeElement, app.elements.confirmCancelGiftButton);
 });
 
+test('the short confirmation opens the explanatory handoff without writing a reservation', async () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  let directWrites = 0;
+  let transactionRuns = 0;
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    serverTimestamp: () => 'timestamp',
+    setDoc: async () => { directWrites += 1; },
+    runTransaction: async () => { transactionRuns += 1; }
+  };
+
+  card.querySelector('.gift-action').click();
+
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), false);
+  assert.equal(app.elements.confirmText.textContent, freeGift.title);
+  assert.equal(directWrites, 0);
+  assert.equal(transactionRuns, 0);
+
+  app.elements.confirmGiftButton.click();
+  await Promise.resolve();
+
+  assert.equal(directWrites, 0, 'the first confirmation must not create a reservation');
+  assert.equal(transactionRuns, 0, 'the transaction starts only from the final handoff button');
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), true);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), false);
+  assert.equal(app.state.purchaseGift, freeGift);
+});
+
+for (const selector of ['.gift-card-main', '.gift-action']) {
+  test(`closing the first purchase modal restores the exact ${selector} trigger`, () => {
+    const app = loadApp();
+    const { card } = prepareFreeCard(app);
+    const trigger = card.querySelector(selector);
+
+    trigger.click();
+
+    assert.equal(app.document.activeElement, app.elements.cancelConfirmButton);
+    app.elements.confirmGiftButton.focus();
+    const tab = createEvent('keydown', { key: 'Tab' });
+    app.elements.confirmModal.dispatchEvent(tab);
+    assert.equal(tab.defaultPrevented, true);
+    assert.equal(app.document.activeElement, app.elements.cancelConfirmButton);
+
+    app.closeConfirmModal();
+    assert.equal(app.document.activeElement, trigger);
+  });
+}
+
+test('closing the first purchase modal after a rerender restores the same control kind', () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  const oldAction = card.querySelector('.gift-action');
+  oldAction.click();
+
+  const replacementCard = app.createGiftCard(freeGift, 'catalog');
+  app.elements.giftGrid.replaceChildren(replacementCard);
+  app.closeConfirmModal();
+
+  assert.equal(app.document.activeElement, replacementCard.querySelector('.gift-action'));
+});
+
+test('handoff focus is trapped and Back returns to the first modal', () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  const trigger = card.querySelector('.gift-action');
+
+  app.openConfirmModal(freeGift, trigger);
+  assert.equal(typeof app.openHandoffModal, 'function');
+  app.openHandoffModal();
+
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), true);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), false);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffBackButton'));
+
+  app.document.querySelector('#handoffConfirmButton').focus();
+  const tab = createEvent('keydown', { key: 'Tab' });
+  app.document.querySelector('#handoffModal').dispatchEvent(tab);
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffBackButton'));
+
+  app.returnToConfirmModal();
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), true);
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), false);
+  assert.equal(app.document.activeElement, app.elements.confirmGiftButton);
+
+  app.closeConfirmModal();
+  assert.equal(app.document.activeElement, trigger);
+});
+
+test('both purchase previews render hostile catalog content only as text', () => {
+  const app = loadApp();
+  const hostileTitle = '<img src=x onerror=alert(1)>';
+  const hostileDescription = '<script>alert(1)</script>';
+  const { freeGift, card } = prepareFreeCard(app, {
+    title: hostileTitle,
+    description: hostileDescription
+  });
+
+  app.openConfirmModal(freeGift, card.querySelector('.gift-card-main'));
+  assert.equal(app.elements.confirmPreview.querySelectorAll('img').length, 1);
+  assert.equal(app.elements.confirmPreview.querySelector('img').alt, hostileTitle);
+  assert.equal(app.elements.confirmPreview.querySelector('strong').textContent, hostileTitle);
+  assert.equal(app.elements.confirmPreview.querySelector('span').textContent, hostileDescription);
+
+  assert.equal(typeof app.openHandoffModal, 'function');
+  app.openHandoffModal();
+  const handoffPreview = app.document.querySelector('#handoffPreview');
+  assert.equal(handoffPreview.querySelectorAll('img').length, 1);
+  assert.equal(handoffPreview.querySelector('strong').textContent, hostileTitle);
+  assert.equal(handoffPreview.querySelector('span').textContent, hostileDescription);
+});
+
+test('final confirmation reserves transactionally, updates UI, waits exactly 700 ms, then assigns the current tab', async () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  const writes = [];
+  let transactionRuns = 0;
+  const timestamp = { kind: 'server-timestamp' };
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    serverTimestamp: () => timestamp,
+    runTransaction: async (firestore, update) => {
+      transactionRuns += 1;
+      return update({
+        async get() { return snapshot(null); },
+        set(ref, data) { writes.push({ ref, data }); }
+      });
+    }
+  };
+  app.openConfirmModal(freeGift, card.querySelector('.gift-card-main'));
+  assert.equal(typeof app.openHandoffModal, 'function');
+  assert.equal(typeof app.reserveAndOpenMarketplace, 'function');
+  app.openHandoffModal();
+
+  const reservation = app.reserveAndOpenMarketplace();
+  await waitForTimer(app, 700);
+
+  assert.equal(transactionRuns, 1);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].ref.collection, 'reservations');
+  assert.equal(writes[0].ref.id, freeGift.id);
+  assert.equal(writes[0].data.phone, app.state.profile.phone);
+  assert.equal(writes[0].data.giftId, freeGift.id);
+  assert.equal(writes[0].data.createdAt, timestamp);
+  assert.equal(app.state.reservations.get(freeGift.id).phone, app.state.profile.phone);
+  assert.equal(app.elements.selectedGiftGrid.children.length, 1);
+  assert.equal(app.getMarketAssignments().length, 0, 'navigation must wait for the visible success delay');
+  assert.equal(app.getTimers().filter((timer) => timer.delay === 700).length, 1);
+  assert.equal(app.document.querySelector('#handoffStatus').textContent, 'Подарок закреплён. Открываем магазин…');
+  assert.equal(app.document.querySelector('#handoffStatus').classList.contains('hidden'), false);
+  assert.equal(app.state.pendingReservation, true);
+  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), 'true');
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffDialog'));
+
+  app.runTimer(700);
+  await reservation;
+
+  assert.deepEqual(app.getMarketAssignments(), [freeGift.marketUrl]);
+});
+
+test('pending reservation blocks duplicate, Back, backdrop, Escape, and Tab escape; a network error remains retryable', async () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  const pendingTransaction = deferred();
+  let transactionRuns = 0;
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    serverTimestamp: () => 'timestamp',
+    runTransaction: () => {
+      transactionRuns += 1;
+      return pendingTransaction.promise;
+    }
+  };
+  app.openConfirmModal(freeGift, card.querySelector('.gift-action'));
+  assert.equal(typeof app.openHandoffModal, 'function');
+  assert.equal(typeof app.reserveAndOpenMarketplace, 'function');
+  app.openHandoffModal();
+
+  const reservation = app.reserveAndOpenMarketplace();
+  const duplicate = app.reserveAndOpenMarketplace();
+  assert.equal(transactionRuns, 1);
+  assert.equal(app.state.pendingReservation, true);
+  assert.equal(app.document.querySelector('#handoffBackButton').disabled, true);
+  assert.equal(app.document.querySelector('#handoffConfirmButton').disabled, true);
+  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), 'true');
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffDialog'));
+
+  app.returnToConfirmModal();
+  app.document.querySelector('#handoffModal').dispatchEvent(createEvent('click', {
+    target: app.document.querySelector('#handoffModal')
+  }));
+  app.document.dispatchEvent(createEvent('keydown', { key: 'Escape' }));
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), false);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffDialog'));
+
+  const tab = createEvent('keydown', { key: 'Tab' });
+  app.document.querySelector('#handoffModal').dispatchEvent(tab);
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffDialog'));
+
+  await duplicate;
+  pendingTransaction.reject(new Error('network unavailable'));
+  await reservation;
+
+  assert.equal(app.getMarketAssignments().length, 0);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), false);
+  assert.equal(app.state.purchaseGift, freeGift);
+  assert.equal(app.state.pendingReservation, false);
+  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), null);
+  assert.equal(app.document.querySelector('#handoffBackButton').disabled, false);
+  assert.equal(app.document.querySelector('#handoffConfirmButton').disabled, false);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffConfirmButton'));
+
+  app.state.firebaseApi.runTransaction = async (firestore, update) => update({
+    async get() { return snapshot(null); },
+    set() {}
+  });
+  const retry = app.reserveAndOpenMarketplace();
+  await waitForTimer(app, 700);
+  app.runTimer(700);
+  await retry;
+  assert.deepEqual(app.getMarketAssignments(), [freeGift.marketUrl]);
+});
+
+test('a reservation conflict rerenders before restoring stable focus and never navigates', async () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  const competingReservation = { phone: '78000000000', displayName: 'Другой гость' };
+  let writes = 0;
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    serverTimestamp: () => 'timestamp',
+    runTransaction: async (firestore, update) => update({
+      async get() { return snapshot(competingReservation); },
+      set() { writes += 1; }
+    })
+  };
+  app.openConfirmModal(freeGift, card.querySelector('.gift-action'));
+  assert.equal(typeof app.openHandoffModal, 'function');
+  assert.equal(typeof app.reserveAndOpenMarketplace, 'function');
+  app.openHandoffModal();
+
+  await app.reserveAndOpenMarketplace();
+
+  assert.equal(writes, 0);
+  assert.equal(app.state.reservations.get(freeGift.id), competingReservation);
+  assert.equal(app.getMarketAssignments().length, 0);
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), true);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), true);
+  assert.equal(app.state.purchaseGift, null);
+  assert.equal(app.document.activeElement, app.elements.giftListTitle);
+});
+
+test('an owned card assigns the marketplace directly without reopening purchase dialogs', () => {
+  const app = loadApp();
+  const { selectedGift, card } = prepareOwnedCard(app);
+  let transactionRuns = 0;
+  app.state.firebaseApi = {
+    runTransaction: async () => { transactionRuns += 1; }
+  };
+
+  card.querySelector('.gift-card-main').click();
+
+  assert.deepEqual(app.getMarketAssignments(), [selectedGift.marketUrl]);
+  assert.equal(transactionRuns, 0);
+  assert.equal(app.elements.confirmModal.classList.contains('hidden'), true);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), true);
+});
+
+for (const selector of ['.gift-card-main', '.gift-action']) {
+  test(`an owned catalog ${selector} assigns directly without a modal or transaction`, () => {
+    const app = loadApp();
+    const { selectedGift } = prepareOwnedCard(app);
+    const catalogCard = app.createGiftCard(selectedGift, 'catalog');
+    app.elements.giftGrid.append(catalogCard);
+    let transactionRuns = 0;
+    app.state.firebaseApi = {
+      runTransaction: async () => { transactionRuns += 1; }
+    };
+
+    catalogCard.querySelector(selector).click();
+
+    assert.deepEqual(app.getMarketAssignments(), [selectedGift.marketUrl]);
+    assert.equal(transactionRuns, 0);
+    assert.equal(app.state.purchaseGift, null);
+    assert.equal(app.elements.confirmModal.classList.contains('hidden'), true);
+    assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), true);
+  });
+}
+
 test('owned reservation transaction deletes exactly the requested reservation', async () => {
   assert.equal(typeof registryCore.deleteOwnedReservation, 'function');
   const targetRef = { id: 'target' };
@@ -565,4 +933,12 @@ function deferred() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+async function waitForTimer(app, delay) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (app.getTimers().some((timer) => timer.delay === delay)) return;
+    await Promise.resolve();
+  }
+  assert.fail(`expected a pending ${delay} ms timer`);
 }

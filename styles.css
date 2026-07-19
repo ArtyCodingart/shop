@@ -606,6 +606,20 @@ input:focus {
   gap: 12px;
 }
 
+.handoff-status {
+  margin: -4px 0 16px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  color: var(--cocoa) !important;
+  background: var(--cream);
+  font-weight: 850;
+}
+
+.confirm-actions button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .toast {
   position: fixed;
   right: 20px;

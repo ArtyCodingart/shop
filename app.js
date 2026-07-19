@@ -1,6 +1,7 @@
 const STORAGE_PHONE_KEY = 'babyGiftRegistry.phone';
 const firebaseSettings = window.giftRegistryFirebase || { config: {}, isConfigured: false };
 const { deleteOwnedReservation, getOwnedGifts, getReservationState } = window.giftRegistryCore;
+const GIFT_ALREADY_RESERVED = 'gift-already-reserved';
 const GIFT_NOT_OWNED = 'gift-not-owned';
 
 const state = {
@@ -13,7 +14,8 @@ const state = {
   reservationsFailed: false,
   gifts: [],
   reservations: new Map(),
-  confirmGift: null,
+  purchaseGift: null,
+  purchaseTrigger: null,
   cancelGift: null,
   cancelGiftId: null,
   cancelTrigger: null,
@@ -50,10 +52,17 @@ const elements = {
   giftListTitle: document.querySelector('#giftListTitle'),
   giftGrid: document.querySelector('#giftGrid'),
   confirmModal: document.querySelector('#confirmModal'),
+  confirmDialog: document.querySelector('#confirmDialog'),
   confirmText: document.querySelector('#confirmText'),
   confirmPreview: document.querySelector('#confirmPreview'),
   cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
   confirmGiftButton: document.querySelector('#confirmGiftButton'),
+  handoffModal: document.querySelector('#handoffModal'),
+  handoffDialog: document.querySelector('#handoffDialog'),
+  handoffPreview: document.querySelector('#handoffPreview'),
+  handoffStatus: document.querySelector('#handoffStatus'),
+  handoffBackButton: document.querySelector('#handoffBackButton'),
+  handoffConfirmButton: document.querySelector('#handoffConfirmButton'),
   cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
   cancelSelectionDialog: document.querySelector('#cancelSelectionDialog'),
   cancelSelectionText: document.querySelector('#cancelSelectionText'),
@@ -89,8 +98,19 @@ function bindEvents() {
       closeConfirmModal();
     }
   });
+  elements.confirmModal.addEventListener('keydown', (event) => {
+    trapPurchaseModalFocus(event, elements.confirmModal, elements.confirmDialog, false);
+  });
   elements.cancelConfirmButton.addEventListener('click', closeConfirmModal);
-  elements.confirmGiftButton.addEventListener('click', reserveConfirmedGift);
+  elements.confirmGiftButton.addEventListener('click', openHandoffModal);
+  elements.handoffModal.addEventListener('click', (event) => {
+    if (event.target === elements.handoffModal) closeHandoffModal();
+  });
+  elements.handoffModal.addEventListener('keydown', (event) => {
+    trapPurchaseModalFocus(event, elements.handoffModal, elements.handoffDialog, state.pendingReservation);
+  });
+  elements.handoffBackButton.addEventListener('click', returnToConfirmModal);
+  elements.handoffConfirmButton.addEventListener('click', reserveAndOpenMarketplace);
   elements.keepGiftButton.addEventListener('click', closeCancelSelectionModal);
   elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
   elements.cancelSelectionModal.addEventListener('click', (event) => {
@@ -99,8 +119,9 @@ function bindEvents() {
   elements.cancelSelectionModal.addEventListener('keydown', trapCancelSelectionFocus);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      closeConfirmModal();
-      closeCancelSelectionModal();
+      if (!elements.handoffModal.classList.contains('hidden')) closeHandoffModal();
+      else if (!elements.confirmModal.classList.contains('hidden')) closeConfirmModal();
+      else if (!elements.cancelSelectionModal.classList.contains('hidden')) closeCancelSelectionModal();
     }
   });
 }
@@ -287,12 +308,13 @@ function normalizePhone(value) {
 
 function clearProfile() {
   localStorage.removeItem(STORAGE_PHONE_KEY);
+  closeConfirmModal();
+  closeHandoffModal();
+  closeCancelSelectionModal();
   state.phone = null;
   state.pendingPhone = null;
   state.profile = null;
   elements.phoneNumber.value = '';
-  closeConfirmModal();
-  closeCancelSelectionModal();
   render();
 }
 
@@ -457,8 +479,10 @@ function createGiftCard(gift, context) {
   action.addEventListener('click', () => {
     if (isSelectedCard) {
       openCancelSelectionModal(gift, action);
-    } else {
-      activateMain();
+    } else if (reservationState === 'own') {
+      openMarketLink(gift);
+    } else if (!isUnavailable) {
+      openConfirmModal(gift, action);
     }
   });
 
@@ -497,7 +521,7 @@ function getGiftDomToken(giftId) {
 }
 
 function openMarketLink(gift) {
-  window.open(gift.marketUrl, '_blank', 'noopener,noreferrer');
+  window.location.assign(gift.marketUrl);
 }
 
 function shouldShowSkeleton() {
@@ -522,68 +546,209 @@ function renderSkeletonCards() {
   }
 }
 
-function openConfirmModal(gift) {
-  if (!gift || !state.profile || !state.firestore) {
-    return;
-  }
+function openConfirmModal(gift, trigger) {
+  if (!gift || !state.profile || !state.firestore || state.pendingReservation) return;
+  if (getReservationState(state.reservations.get(gift.id), state.profile.phone) !== 'free') return;
 
-  state.confirmGift = gift;
-  elements.confirmText.textContent = `Подтвердите, что ${state.profile.displayName} хочет купить этот подарок.`;
-  elements.confirmPreview.innerHTML = `
-    <img src="${escapeAttribute(state.confirmGift.imageUrl)}" alt="${escapeAttribute(state.confirmGift.title)}">
-    <div>
-      <strong>${escapeHtml(state.confirmGift.title)}</strong>
-      <span>${escapeHtml(state.confirmGift.description)}</span>
-    </div>
-  `;
+  state.purchaseGift = gift;
+  state.purchaseTrigger = trigger;
+  elements.confirmText.textContent = gift.title;
+  renderGiftPreview(elements.confirmPreview, gift);
   elements.confirmGiftButton.disabled = false;
-  elements.confirmGiftButton.textContent = 'Да, я хочу купить';
+  elements.confirmGiftButton.textContent = 'Да';
   elements.confirmModal.classList.remove('hidden');
+  elements.cancelConfirmButton.focus();
 }
 
 function closeConfirmModal() {
-  if (state.pendingReservation) {
-    return;
-  }
+  if (state.pendingReservation) return;
 
   elements.confirmModal.classList.add('hidden');
-  state.confirmGift = null;
+  if (elements.handoffModal.classList.contains('hidden')) resetPurchaseFlow();
 }
 
-async function reserveConfirmedGift() {
-  if (!state.confirmGift || !state.profile || !state.firestore) {
+function openHandoffModal() {
+  const gift = state.purchaseGift;
+  if (!gift || state.pendingReservation) return;
+
+  elements.confirmModal.classList.add('hidden');
+  renderGiftPreview(elements.handoffPreview, gift);
+  elements.handoffStatus.textContent = '';
+  elements.handoffStatus.classList.add('hidden');
+  elements.handoffDialog.removeAttribute('aria-busy');
+  elements.handoffBackButton.disabled = false;
+  elements.handoffConfirmButton.disabled = false;
+  elements.handoffConfirmButton.textContent = 'Понятно, перейти';
+  elements.handoffModal.classList.remove('hidden');
+  elements.handoffBackButton.focus();
+}
+
+function returnToConfirmModal() {
+  if (state.pendingReservation || !state.purchaseGift) return;
+
+  elements.handoffModal.classList.add('hidden');
+  elements.confirmModal.classList.remove('hidden');
+  elements.confirmGiftButton.focus();
+}
+
+function closeHandoffModal() {
+  if (state.pendingReservation || elements.handoffModal.classList.contains('hidden')) return;
+
+  elements.handoffModal.classList.add('hidden');
+  resetPurchaseFlow();
+}
+
+function resetPurchaseFlow() {
+  const giftId = state.purchaseGift?.id;
+  const trigger = state.purchaseTrigger;
+
+  state.purchaseGift = null;
+  state.purchaseTrigger = null;
+  elements.handoffStatus.textContent = '';
+  elements.handoffStatus.classList.add('hidden');
+  restorePurchaseFocus(giftId, trigger);
+}
+
+function restorePurchaseFocus(giftId, trigger) {
+  if (trigger?.isConnected && !trigger.disabled) {
+    trigger.focus();
     return;
   }
 
-  const { doc, serverTimestamp, setDoc } = state.firebaseApi;
+  const triggerSelector = trigger?.classList.contains('gift-action') ? '.gift-action' : '.gift-card-main';
+  const catalogCard = Array.from(elements.giftGrid.children).find((card) => card.dataset.giftId === giftId);
+  const replacementTrigger = catalogCard?.querySelector(triggerSelector);
+  if (replacementTrigger && !replacementTrigger.disabled) {
+    replacementTrigger.focus();
+    return;
+  }
+
+  elements.giftListTitle.focus();
+}
+
+function trapPurchaseModalFocus(event, modal, dialog, pending) {
+  if (event.key !== 'Tab' || modal.classList.contains('hidden')) return;
+
+  if (pending) {
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+
+  const controls = Array.from(modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+  if (controls.length === 0) {
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+
+  const firstControl = controls[0];
+  const lastControl = controls[controls.length - 1];
+  if (event.shiftKey && document.activeElement === firstControl) {
+    event.preventDefault();
+    lastControl.focus();
+  } else if (!event.shiftKey && document.activeElement === lastControl) {
+    event.preventDefault();
+    firstControl.focus();
+  }
+}
+
+function renderGiftPreview(container, gift) {
+  const image = document.createElement('img');
+  const copy = document.createElement('div');
+  const title = document.createElement('strong');
+  const description = document.createElement('span');
+
+  image.src = gift.imageUrl;
+  image.alt = gift.title;
+  title.textContent = gift.title;
+  description.textContent = gift.description;
+  copy.append(title, description);
+  container.replaceChildren(image, copy);
+}
+
+async function reserveAndOpenMarketplace() {
+  const gift = state.purchaseGift;
+  const profile = state.profile;
+  if (!gift || !profile || !state.firestore || state.pendingReservation) return;
+
+  const { doc, runTransaction, serverTimestamp } = state.firebaseApi;
+  const reservationRef = doc(state.firestore, 'reservations', gift.id);
+  let navigating = false;
 
   try {
     state.pendingReservation = true;
-    elements.confirmGiftButton.disabled = true;
-    elements.confirmGiftButton.textContent = 'Закрепляем...';
+    elements.handoffDialog.setAttribute('aria-busy', 'true');
+    elements.handoffDialog.focus();
+    elements.handoffBackButton.disabled = true;
+    elements.handoffConfirmButton.disabled = true;
+    elements.handoffConfirmButton.textContent = 'Закрепляем…';
 
-    await setDoc(doc(state.firestore, 'reservations', state.confirmGift.id), {
-      phone: state.profile.phone,
-      giftId: state.confirmGift.id,
-      firstName: state.profile.firstName,
-      lastName: state.profile.lastName,
-      displayName: state.profile.displayName,
-      createdAt: serverTimestamp()
+    await runTransaction(state.firestore, async (transaction) => {
+      const snapshot = await transaction.get(reservationRef);
+      if (snapshot.exists()) {
+        const error = new Error('Gift is already reserved');
+        error.code = GIFT_ALREADY_RESERVED;
+        error.reservation = snapshot.data();
+        throw error;
+      }
+
+      transaction.set(reservationRef, {
+        phone: profile.phone,
+        giftId: gift.id,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        displayName: profile.displayName,
+        createdAt: serverTimestamp()
+      });
     });
 
-    showToast('Готово! Подарок закреплен за вами.');
-    elements.confirmModal.classList.add('hidden');
-    state.confirmGift = null;
+    state.reservations.set(gift.id, {
+      phone: profile.phone,
+      giftId: gift.id,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      displayName: profile.displayName
+    });
     renderSelectedGifts();
     renderGifts();
+    elements.handoffStatus.textContent = 'Подарок закреплён. Открываем магазин…';
+    elements.handoffStatus.classList.remove('hidden');
+    elements.handoffConfirmButton.textContent = 'Открываем…';
+    navigating = true;
+    await wait(700);
+    window.location.assign(gift.marketUrl);
   } catch (error) {
-    showToast('Не получилось закрепить подарок. Возможно, его уже выбрали.');
-    console.error(error);
+    if (error.code === GIFT_ALREADY_RESERVED) {
+      state.reservations.set(gift.id, error.reservation);
+      elements.confirmModal.classList.add('hidden');
+      elements.handoffModal.classList.add('hidden');
+      renderSelectedGifts();
+      renderGifts();
+      resetPurchaseFlow();
+      showToast('Этот подарок уже выбрали. Посмотрите другие варианты.');
+    } else {
+      elements.handoffStatus.textContent = 'Не получилось закрепить подарок. Проверьте соединение и попробуйте ещё раз.';
+      elements.handoffStatus.classList.remove('hidden');
+      showToast('Не получилось закрепить подарок. Проверьте соединение и попробуйте ещё раз.');
+      console.error(error);
+    }
   } finally {
     state.pendingReservation = false;
-    elements.confirmGiftButton.disabled = false;
-    elements.confirmGiftButton.textContent = 'Да, я хочу купить';
+    if (!navigating) {
+      elements.handoffDialog.removeAttribute('aria-busy');
+      elements.handoffBackButton.disabled = false;
+      elements.handoffConfirmButton.disabled = false;
+      elements.handoffConfirmButton.textContent = 'Понятно, перейти';
+      if (state.purchaseGift === gift && !elements.handoffModal.classList.contains('hidden')) {
+        elements.handoffConfirmButton.focus();
+      }
+    }
   }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function openCancelSelectionModal(gift, trigger) {
@@ -719,17 +884,4 @@ function showToast(message) {
   showToast.timeoutId = window.setTimeout(() => {
     elements.toast.classList.add('hidden');
   }, 4200);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value).replaceAll('`', '&#096;');
 }

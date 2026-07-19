@@ -43,6 +43,7 @@ const requiredHtmlSnippets = [
   'id="giftGrid"',
   'Выберите подарки, которые хотите купить. Свободная карточка сначала покажет подтверждение.',
   'id="confirmModal"',
+  'id="confirmDialog" tabindex="-1"',
   'Выбор подарка',
   'id="confirmTitle"',
   'id="confirmText"',
@@ -53,6 +54,7 @@ const requiredHtmlSnippets = [
   'Хотите купить этот подарок?',
   '<button class="primary-action" id="confirmGiftButton" type="button">Да</button>',
   'id="handoffModal"',
+  'id="handoffDialog" tabindex="-1"',
   'Перед переходом',
   'id="handoffTitle"',
   'id="handoffPreview"',
@@ -119,6 +121,18 @@ const requiredAppSnippets = [
   "loadUserByPhone",
   "createUserProfile",
   "openMarketLink",
+  "state.purchaseGift",
+  "state.purchaseTrigger",
+  "openHandoffModal",
+  "returnToConfirmModal",
+  "reserveAndOpenMarketplace",
+  "transaction.set(reservationRef",
+  "error.code = GIFT_ALREADY_RESERVED",
+  "await wait(700)",
+  "window.location.assign(gift.marketUrl)",
+  "trapPurchaseModalFocus",
+  "restorePurchaseFocus",
+  "handoffDialog.setAttribute('aria-busy', 'true')",
   "window.giftRegistryCore",
   "getOwnedGifts",
   "getReservationState",
@@ -163,6 +177,19 @@ for (const snippet of requiredAppSnippets) {
   }
 }
 
+const selectedGiftIdMatches = app.match(/selectedGiftId/g) || [];
+if (selectedGiftIdMatches.length !== 1 || !app.includes("selectedGiftId: ''")) {
+  throw new Error('selectedGiftId must remain only as an empty profile compatibility field');
+}
+
+if (app.includes('window.open(')) {
+  throw new Error('marketplace navigation must use the current tab');
+}
+
+if (app.includes("setDoc(doc(state.firestore, 'reservations'")) {
+  throw new Error('reservation creation must use a transaction');
+}
+
 if (app.includes("import { firebaseConfig, isFirebaseConfigured }")) {
   throw new Error('app.js must not use a static module import for local file previews');
 }
@@ -192,6 +219,8 @@ if (app.includes('mainControl.append(image, body)')) {
 for (const styleSnippet of [
   '.selected-gifts',
   '.selected-gift-grid',
+  '.handoff-status',
+  '.confirm-actions button:disabled',
   '.gift-card-main',
   '.unavailable-gift',
   ':not(.unavailable-gift)',
