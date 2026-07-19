@@ -4,8 +4,23 @@ import { URL } from 'node:url';
 const root = new URL('../', import.meta.url);
 const html = await readFile(new URL('index.html', root), 'utf8');
 const app = await readFile(new URL('app.js', root), 'utf8');
+const styles = await readFile(new URL('styles.css', root), 'utf8');
 const config = await readFile(new URL('firebase-config.js', root), 'utf8');
 const core = await readFile(new URL('registry-core.js', root), 'utf8');
+
+for (const forbiddenSnippet of [
+  'switchChoiceModal',
+  'switchGift',
+  'pendingSwitch',
+  'openSwitchChoiceModal',
+  'switchConfirmedGift',
+  'getConfirmedSelectedGift',
+  'syncSelectedGift'
+]) {
+  if (html.includes(forbiddenSnippet) || app.includes(forbiddenSnippet)) {
+    throw new Error(`single-selection flow still contains ${forbiddenSnippet}`);
+  }
+}
 
 const requiredHtmlSnippets = [
   'id="bootView"',
@@ -18,7 +33,7 @@ const requiredHtmlSnippets = [
   'id="registerView"',
   'id="registerForm"',
   'id="registerButton"',
-  'class="selected-gift selected-gifts hidden"',
+  'class="selected-gifts hidden"',
   'id="selectedGiftSection"',
   'id="selectedGiftTitle"',
   'id="selectedGiftGrid"',
@@ -48,8 +63,6 @@ const requiredHtmlSnippets = [
   'В магазине нужно самостоятельно оформить и оплатить покупку. Если подарок уже заняли, переход не произойдёт.',
   '<button class="ghost-button" id="handoffBackButton" type="button">Назад</button>',
   '<button class="primary-action" id="handoffConfirmButton" type="button">Понятно, перейти</button>',
-  'id="switchChoiceModal"',
-  'id="goToCancelGiftButton"',
   'id="cancelSelectionModal"',
   'id="cancelSelectionText"',
   'id="confirmCancelGiftButton"'
@@ -63,14 +76,9 @@ for (const snippet of requiredHtmlSnippets) {
 
 const confirmModalIndex = html.indexOf('id="confirmModal"');
 const handoffModalIndex = html.indexOf('id="handoffModal"');
-const switchChoiceModalIndex = html.indexOf('id="switchChoiceModal"');
 
 if (confirmModalIndex >= handoffModalIndex) {
   throw new Error('handoffModal must follow confirmModal');
-}
-
-if (handoffModalIndex >= switchChoiceModalIndex) {
-  throw new Error('switchChoiceModal must follow handoffModal');
 }
 
 const scriptSources = Array.from(
@@ -102,22 +110,24 @@ const requiredAppSnippets = [
   "normalizePhone",
   "loadUserByPhone",
   "createUserProfile",
-  "deleteDoc",
   "openMarketLink",
-  "openSwitchChoiceModal",
-  "switchConfirmedGift",
+  "window.giftRegistryCore",
+  "getOwnedGifts",
+  "getReservationState",
+  "renderSelectedGifts",
+  "createGiftCard",
+  "state.cancelGift",
+  "openCancelSelectionModal(gift",
   "runTransaction",
-  "pendingSwitch",
+  "transaction.delete(reservationRef)",
   "event.stopPropagation()",
   "pendingLogin",
   "pendingProfile",
   "toggleAccountMenu",
   "getInitials",
-  'id="cancelGiftButton"',
   "selectedGiftId",
   'reservationsLoaded',
   'renderSkeletonCards',
-  'renderSelectedGift',
   "fetch('./gifts.json'",
   "collection(state.firestore, 'reservations')",
   "location.protocol === 'file:'"
@@ -139,6 +149,17 @@ if (app.includes('window.confirm')) {
 
 if (app.includes('Уже есть выбор')) {
   throw new Error('gift action must stay available and open the switch choice modal after a gift was selected');
+}
+
+for (const styleSnippet of [
+  '.selected-gifts',
+  '.selected-gift-grid',
+  'flex-direction: column',
+  'margin-top: auto'
+]) {
+  if (!styles.includes(styleSnippet)) {
+    throw new Error(`styles.css missing ${styleSnippet}`);
+  }
 }
 
 if (html.includes('id="giftModal"') || app.includes('giftModal') || app.includes('openModal')) {

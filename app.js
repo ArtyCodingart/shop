@@ -1,5 +1,7 @@
 const STORAGE_PHONE_KEY = 'babyGiftRegistry.phone';
 const firebaseSettings = window.giftRegistryFirebase || { config: {}, isConfigured: false };
+const { getOwnedGifts, getReservationState } = window.giftRegistryCore;
+const GIFT_NOT_OWNED = 'gift-not-owned';
 
 const state = {
   booting: true,
@@ -12,11 +14,11 @@ const state = {
   gifts: [],
   reservations: new Map(),
   confirmGift: null,
-  switchGift: null,
+  cancelGift: null,
+  cancelTrigger: null,
   pendingLogin: false,
   pendingProfile: false,
   pendingReservation: false,
-  pendingSwitch: false,
   pendingCancel: false,
   firestore: null,
   firebaseReady: false,
@@ -43,18 +45,15 @@ const elements = {
   logoutButton: document.querySelector('#logoutButton'),
   statusBanner: document.querySelector('#statusBanner'),
   selectedGiftSection: document.querySelector('#selectedGiftSection'),
+  selectedGiftGrid: document.querySelector('#selectedGiftGrid'),
   giftGrid: document.querySelector('#giftGrid'),
   confirmModal: document.querySelector('#confirmModal'),
   confirmText: document.querySelector('#confirmText'),
   confirmPreview: document.querySelector('#confirmPreview'),
   cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
   confirmGiftButton: document.querySelector('#confirmGiftButton'),
-  switchChoiceModal: document.querySelector('#switchChoiceModal'),
-  switchChoiceText: document.querySelector('#switchChoiceText'),
-  switchChoicePreview: document.querySelector('#switchChoicePreview'),
-  keepCurrentGiftButton: document.querySelector('#keepCurrentGiftButton'),
-  goToCancelGiftButton: document.querySelector('#goToCancelGiftButton'),
   cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
+  cancelSelectionText: document.querySelector('#cancelSelectionText'),
   keepGiftButton: document.querySelector('#keepGiftButton'),
   confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
   toast: document.querySelector('#toast')
@@ -89,19 +88,14 @@ function bindEvents() {
   });
   elements.cancelConfirmButton.addEventListener('click', closeConfirmModal);
   elements.confirmGiftButton.addEventListener('click', reserveConfirmedGift);
-  elements.switchChoiceModal.addEventListener('click', (event) => {
-    if (event.target === elements.switchChoiceModal) {
-      closeSwitchChoiceModal();
-    }
-  });
-  elements.keepCurrentGiftButton.addEventListener('click', closeSwitchChoiceModal);
-  elements.goToCancelGiftButton.addEventListener('click', switchConfirmedGift);
   elements.keepGiftButton.addEventListener('click', closeCancelSelectionModal);
   elements.confirmCancelGiftButton.addEventListener('click', cancelSelectedGift);
+  elements.cancelSelectionModal.addEventListener('click', (event) => {
+    if (event.target === elements.cancelSelectionModal) closeCancelSelectionModal();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeConfirmModal();
-      closeSwitchChoiceModal();
       closeCancelSelectionModal();
     }
   });
@@ -166,15 +160,15 @@ function subscribeToReservations() {
       state.reservations = new Map(snapshot.docs.map((reservationDoc) => [reservationDoc.id, reservationDoc.data()]));
       state.reservationsLoaded = true;
       state.reservationsFailed = false;
-      syncSelectedGift();
       renderGifts();
-      renderSelectedGift();
+      renderSelectedGifts();
     },
     (error) => {
       state.reservationsLoaded = true;
       state.reservationsFailed = true;
       showBanner('Не удалось получить занятые подарки. Попробуйте обновить страницу.');
       renderGifts();
+      renderSelectedGifts();
       console.error(error);
     }
   );
@@ -225,7 +219,6 @@ async function loadUserByPhone(phone) {
   state.pendingPhone = null;
   state.profile = normalizeUser(userSnapshot.data());
   localStorage.setItem(STORAGE_PHONE_KEY, phone);
-  syncSelectedGift();
 }
 
 async function createUserProfile(event) {
@@ -280,24 +273,12 @@ function normalizeUser(user) {
     phone: user.phone || state.phone || state.pendingPhone,
     firstName: user.firstName || '',
     lastName: user.lastName || '',
-    displayName: user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-    selectedGiftId: user.selectedGiftId || ''
+    displayName: user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim()
   };
 }
 
 function normalizePhone(value) {
   return String(value).replace(/\D/g, '');
-}
-
-function syncSelectedGift() {
-  if (!state.profile || !state.profile.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
-    return;
-  }
-
-  const reservation = state.reservations.get(state.profile.selectedGiftId);
-  if (!reservation || reservation.phone !== state.profile.phone) {
-    state.profile.selectedGiftId = '';
-  }
 }
 
 function clearProfile() {
@@ -307,7 +288,6 @@ function clearProfile() {
   state.profile = null;
   elements.phoneNumber.value = '';
   closeConfirmModal();
-  closeSwitchChoiceModal();
   closeCancelSelectionModal();
   render();
 }
@@ -345,7 +325,7 @@ function render() {
   elements.profileName.textContent = state.profile.displayName;
   elements.accountInitials.textContent = getInitials(state.profile.displayName);
   elements.accountMenu.classList.remove('hidden');
-  renderSelectedGift();
+  renderSelectedGifts();
   renderGifts();
 }
 
@@ -372,35 +352,24 @@ function getInitials(name) {
     .toUpperCase() || '?';
 }
 
-function renderSelectedGift() {
-  const selectedGift = getConfirmedSelectedGift();
+function renderSelectedGifts() {
+  elements.selectedGiftGrid.replaceChildren();
 
-  if (!selectedGift) {
+  if (!state.profile || !state.reservationsLoaded || state.reservationsFailed) {
     elements.selectedGiftSection.classList.add('hidden');
-    elements.selectedGiftSection.innerHTML = '';
     return;
   }
 
-  elements.selectedGiftSection.classList.remove('hidden');
-  elements.selectedGiftSection.innerHTML = `
-    <div class="selected-copy">
-      <p class="eyebrow">Вы выбрали подарок</p>
-      <h2 id="selectedGiftTitle">${escapeHtml(selectedGift.title)}</h2>
-      <a class="market-link" href="${escapeAttribute(selectedGift.marketUrl)}" target="_blank" rel="noreferrer">Где его купить</a>
-      <p>${escapeHtml(selectedGift.description)}</p>
-    </div>
-    <img src="${escapeAttribute(selectedGift.imageUrl)}" alt="${escapeAttribute(selectedGift.title)}">
-    <div class="cancel-gift-panel">
-      <p>Если вы решили освободить подарок для других гостей и пока ничего не выбирать, можно отказаться от него.</p>
-      <button class="soft-danger-action" id="cancelGiftButton" type="button">Отказаться от подарка</button>
-    </div>
-  `;
+  const ownedGifts = getOwnedGifts(state.gifts, state.reservations, state.profile.phone);
+  elements.selectedGiftSection.classList.toggle('hidden', ownedGifts.length === 0);
 
-  document.querySelector('#cancelGiftButton').addEventListener('click', openCancelSelectionModal);
+  for (const gift of ownedGifts) {
+    elements.selectedGiftGrid.append(createGiftCard(gift, 'selected'));
+  }
 }
 
 function renderGifts() {
-  elements.giftGrid.innerHTML = '';
+  elements.giftGrid.replaceChildren();
 
   if (shouldShowSkeleton()) {
     renderSkeletonCards();
@@ -413,49 +382,84 @@ function renderGifts() {
   }
 
   for (const gift of state.gifts) {
-    const reservation = state.reservations.get(gift.id);
-    const isReserved = Boolean(reservation);
-    const userAlreadySelected = Boolean(state.profile?.selectedGiftId);
-    const isOwnSelection = state.profile?.selectedGiftId === gift.id && isReserved;
-    const card = document.createElement('article');
-
-    card.className = `gift-card${isReserved ? ' reserved' : ''}${isOwnSelection ? ' own-gift' : ''}`;
-    card.tabIndex = 0;
-    card.setAttribute('role', 'link');
-    card.setAttribute('aria-label', `Открыть магазин: ${gift.title}`);
-    card.innerHTML = `
-      <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}" loading="lazy">
-      <div class="gift-body">
-        <div class="gift-topline">
-          <span>${escapeHtml(gift.category)}</span>
-        </div>
-        <h2>${escapeHtml(gift.title)}</h2>
-        <p>${escapeHtml(gift.description)}</p>
-        ${getAvailabilityText(isReserved, reservation, isOwnSelection) ? `<p>${getAvailabilityText(isReserved, reservation, isOwnSelection)}</p>` : ''}
-        <button class="gift-action" type="button" ${isGiftActionDisabled(isReserved, isOwnSelection, userAlreadySelected) ? 'disabled' : ''}>
-          ${getActionText(isReserved, isOwnSelection, userAlreadySelected)}
-        </button>
-      </div>
-    `;
-
-    const button = card.querySelector('button');
-    card.addEventListener('click', () => openMarketLink(gift));
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        openMarketLink(gift);
-      }
-    });
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (userAlreadySelected && !isOwnSelection && !isReserved) {
-        openSwitchChoiceModal(gift);
-        return;
-      }
-
-      openConfirmModal(gift);
-    });
-    elements.giftGrid.append(card);
+    elements.giftGrid.append(createGiftCard(gift, 'catalog'));
   }
+}
+
+function createGiftCard(gift, context) {
+  const reservation = state.reservations.get(gift.id);
+  const reservationState = getReservationState(reservation, state.profile?.phone);
+  const isSelectedCard = context === 'selected';
+  const isUnavailable = !state.firebaseReady || state.reservationsFailed || reservationState === 'reserved';
+  const card = document.createElement('article');
+  const cardAction = isSelectedCard || reservationState === 'own' ? 'market' : 'select';
+
+  card.className = `gift-card${reservationState !== 'free' ? ' reserved' : ''}${reservationState === 'own' ? ' own-gift' : ''}${isSelectedCard ? ' selected-gift-card' : ''}`;
+  card.tabIndex = isUnavailable && reservationState !== 'own' ? -1 : 0;
+  card.setAttribute('role', isUnavailable && reservationState !== 'own' ? 'group' : cardAction === 'market' ? 'link' : 'button');
+  card.setAttribute('aria-label', getCardAriaLabel(gift, reservationState, isUnavailable));
+  card.innerHTML = `
+    <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}" loading="lazy">
+    <div class="gift-body">
+      <div class="gift-topline"><span>${escapeHtml(gift.category)}</span></div>
+      <h2>${escapeHtml(gift.title)}</h2>
+      <p>${escapeHtml(gift.description)}</p>
+      ${getAvailabilityText(reservationState, reservation, isSelectedCard) ? `<p class="gift-status">${getAvailabilityText(reservationState, reservation, isSelectedCard)}</p>` : ''}
+      <button class="gift-action${isSelectedCard ? ' cancel-gift-action' : ''}" type="button" ${isUnavailable && !isSelectedCard && reservationState !== 'own' ? 'disabled' : ''}>
+        ${getActionText(reservationState, isSelectedCard)}
+      </button>
+    </div>
+  `;
+
+  const button = card.querySelector('button');
+  const activateCard = () => {
+    if (isSelectedCard || reservationState === 'own') {
+      openMarketLink(gift);
+    } else if (!isUnavailable) {
+      openConfirmModal(gift, card);
+    }
+  };
+
+  card.addEventListener('click', activateCard);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      activateCard();
+    }
+  });
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+
+    if (isSelectedCard) {
+      openCancelSelectionModal(gift, button);
+    } else {
+      activateCard();
+    }
+  });
+
+  return card;
+}
+
+function getAvailabilityText(reservationState, reservation, isSelectedCard) {
+  if (reservationState === 'own' && isSelectedCard) return 'Вы покупаете этот подарок.';
+  if (reservationState === 'own') return 'Этот подарок покупаете вы.';
+  if (reservationState === 'reserved') return `Уже покупает ${reservation.displayName}.`;
+  if (!state.firebaseReady || state.reservationsFailed) return 'Покупка временно недоступна.';
+  return '';
+}
+
+function getActionText(reservationState, isSelectedCard) {
+  if (isSelectedCard) return 'Отказаться';
+  if (reservationState === 'own') return 'Перейти в магазин';
+  if (reservationState === 'reserved') return 'Уже купят';
+  if (!state.firebaseReady || state.reservationsFailed) return 'Загрузка статуса';
+  return 'Я хочу купить';
+}
+
+function getCardAriaLabel(gift, reservationState, isUnavailable) {
+  if (reservationState === 'own') return `Открыть магазин: ${gift.title}`;
+  if (isUnavailable) return `Подарок недоступен: ${gift.title}`;
+  return `Выбрать подарок: ${gift.title}`;
 }
 
 function openMarketLink(gift) {
@@ -482,55 +486,6 @@ function renderSkeletonCards() {
     `;
     elements.giftGrid.append(card);
   }
-}
-
-function isGiftActionDisabled(isReserved) {
-  return !state.firebaseReady || state.reservationsFailed || isReserved;
-}
-
-function getConfirmedSelectedGift() {
-  if (!state.profile?.selectedGiftId || !state.reservationsLoaded || state.reservationsFailed) {
-    return null;
-  }
-
-  const reservation = state.reservations.get(state.profile.selectedGiftId);
-  if (!reservation || reservation.phone !== state.profile.phone) {
-    return null;
-  }
-
-  return state.gifts.find((gift) => gift.id === state.profile.selectedGiftId) || null;
-}
-
-function getAvailabilityText(isReserved, reservation, isOwnSelection) {
-  if (isOwnSelection) {
-    return 'Вы покупаете этот подарок.';
-  }
-
-  if (isReserved) {
-    return `Уже покупает ${reservation.displayName}.`;
-  }
-
-  if (!state.firebaseReady || state.reservationsFailed) {
-    return 'Покупка временно недоступна.';
-  }
-
-  return '';
-}
-
-function getActionText(isReserved, isOwnSelection, userAlreadySelected) {
-  if (isOwnSelection) {
-    return 'Ваш подарок';
-  }
-
-  if (isReserved) {
-    return 'Уже купят';
-  }
-
-  if (!state.firebaseReady || state.reservationsFailed) {
-    return 'Загрузка статуса';
-  }
-
-  return 'Я хочу купить';
 }
 
 function openConfirmModal(gift) {
@@ -561,107 +516,6 @@ function closeConfirmModal() {
   state.confirmGift = null;
 }
 
-function openSwitchChoiceModal(gift) {
-  const selectedGift = getConfirmedSelectedGift();
-
-  if (!gift || !selectedGift) {
-    return;
-  }
-
-  state.switchGift = gift;
-  elements.switchChoiceText.textContent = `Сейчас за вами закреплен подарок «${selectedGift.title}». Если подтвердить смену, мы сразу освободим его для других гостей и закрепим за вами «${gift.title}».`;
-  elements.switchChoicePreview.innerHTML = `
-    <img src="${escapeAttribute(gift.imageUrl)}" alt="${escapeAttribute(gift.title)}">
-    <div>
-      <strong>${escapeHtml(gift.title)}</strong>
-      <span>${escapeHtml(gift.description)}</span>
-    </div>
-  `;
-  elements.switchChoiceModal.classList.remove('hidden');
-}
-
-function closeSwitchChoiceModal() {
-  if (state.pendingSwitch) {
-    return;
-  }
-
-  elements.switchChoiceModal.classList.add('hidden');
-  state.switchGift = null;
-}
-
-async function switchConfirmedGift() {
-  const previousGift = getConfirmedSelectedGift();
-  const nextGift = state.switchGift;
-
-  if (!previousGift || !nextGift || !state.profile || !state.firestore) {
-    return;
-  }
-
-  const { doc, runTransaction, serverTimestamp } = state.firebaseApi;
-  const previousReservationRef = doc(state.firestore, 'reservations', previousGift.id);
-  const nextReservationRef = doc(state.firestore, 'reservations', nextGift.id);
-  const userRef = doc(state.firestore, 'users', state.profile.phone);
-
-  try {
-    state.pendingSwitch = true;
-    elements.keepCurrentGiftButton.disabled = true;
-    elements.goToCancelGiftButton.disabled = true;
-    elements.goToCancelGiftButton.textContent = 'Меняем...';
-
-    await runTransaction(state.firestore, async (transaction) => {
-      const [previousReservation, nextReservation] = await Promise.all([
-        transaction.get(previousReservationRef),
-        transaction.get(nextReservationRef)
-      ]);
-
-      if (!previousReservation.exists() || previousReservation.data().phone !== state.profile.phone) {
-        throw new Error('Current gift is no longer reserved by this user');
-      }
-
-      if (nextReservation.exists()) {
-        throw new Error('Next gift is already reserved');
-      }
-
-      transaction.delete(previousReservationRef);
-      transaction.set(nextReservationRef, {
-        phone: state.profile.phone,
-        giftId: nextGift.id,
-        firstName: state.profile.firstName,
-        lastName: state.profile.lastName,
-        displayName: state.profile.displayName,
-        createdAt: serverTimestamp()
-      });
-      transaction.set(userRef, {
-        selectedGiftId: nextGift.id,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    });
-
-    state.profile.selectedGiftId = nextGift.id;
-    state.reservations.delete(previousGift.id);
-    state.reservations.set(nextGift.id, {
-      phone: state.profile.phone,
-      giftId: nextGift.id,
-      firstName: state.profile.firstName,
-      lastName: state.profile.lastName,
-      displayName: state.profile.displayName
-    });
-    elements.switchChoiceModal.classList.add('hidden');
-    state.switchGift = null;
-    showToast('Выбор изменен. Новый подарок закреплен за вами.');
-    renderSelectedGift();
-    renderGifts();
-  } catch (error) {
-    showToast('Не получилось сменить подарок. Возможно, новый подарок уже выбрали.');
-    console.error(error);
-  } finally {
-    state.pendingSwitch = false;
-    elements.keepCurrentGiftButton.disabled = false;
-    elements.goToCancelGiftButton.disabled = false;
-    elements.goToCancelGiftButton.textContent = 'Да, хочу сменить';
-  }
-}
-
 async function reserveConfirmedGift() {
   if (!state.confirmGift || !state.profile || !state.firestore) {
     return;
@@ -683,16 +537,10 @@ async function reserveConfirmedGift() {
       createdAt: serverTimestamp()
     });
 
-    await setDoc(doc(state.firestore, 'users', state.profile.phone), {
-      selectedGiftId: state.confirmGift.id,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    state.profile.selectedGiftId = state.confirmGift.id;
     showToast('Готово! Подарок закреплен за вами.');
     elements.confirmModal.classList.add('hidden');
     state.confirmGift = null;
-    renderSelectedGift();
+    renderSelectedGifts();
     renderGifts();
   } catch (error) {
     showToast('Не получилось закрепить подарок. Возможно, его уже выбрали.');
@@ -704,11 +552,14 @@ async function reserveConfirmedGift() {
   }
 }
 
-function openCancelSelectionModal() {
-  if (!getConfirmedSelectedGift()) {
+function openCancelSelectionModal(gift, trigger) {
+  if (!gift || getReservationState(state.reservations.get(gift.id), state.profile?.phone) !== 'own') {
     return;
   }
 
+  state.cancelGift = gift;
+  state.cancelTrigger = trigger;
+  elements.cancelSelectionText.textContent = `Подарок «${gift.title}» снова станет доступен другим гостям. Остальные ваши подарки сохранятся.`;
   elements.cancelSelectionModal.classList.remove('hidden');
 }
 
@@ -718,37 +569,60 @@ function closeCancelSelectionModal() {
   }
 
   elements.cancelSelectionModal.classList.add('hidden');
+  const trigger = state.cancelTrigger;
+  state.cancelGift = null;
+  state.cancelTrigger = null;
+  if (trigger?.isConnected) trigger.focus();
 }
 
 async function cancelSelectedGift() {
-  const selectedGift = getConfirmedSelectedGift();
-  if (!selectedGift || !state.profile || !state.firestore) {
-    return;
-  }
+  const gift = state.cancelGift;
+  if (!gift || !state.profile || !state.firestore) return;
 
-  const { deleteDoc, doc, serverTimestamp, setDoc } = state.firebaseApi;
+  const { doc, runTransaction } = state.firebaseApi;
+  const reservationRef = doc(state.firestore, 'reservations', gift.id);
 
   try {
     state.pendingCancel = true;
+    elements.keepGiftButton.disabled = true;
     elements.confirmCancelGiftButton.disabled = true;
-    elements.confirmCancelGiftButton.textContent = 'Отказываемся...';
+    elements.confirmCancelGiftButton.textContent = 'Отказываемся…';
 
-    await deleteDoc(doc(state.firestore, 'reservations', selectedGift.id));
-    await setDoc(doc(state.firestore, 'users', state.profile.phone), {
-      selectedGiftId: '',
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    await runTransaction(state.firestore, async (transaction) => {
+      const snapshot = await transaction.get(reservationRef);
+      if (!snapshot.exists() || snapshot.data().phone !== state.profile.phone) {
+        const error = new Error('Gift is not reserved by this profile');
+        error.code = GIFT_NOT_OWNED;
+        error.reservation = snapshot.exists() ? snapshot.data() : null;
+        throw error;
+      }
+      transaction.delete(reservationRef);
+    });
 
-    state.profile.selectedGiftId = '';
+    state.reservations.delete(gift.id);
     elements.cancelSelectionModal.classList.add('hidden');
-    showToast('Вы отказались от подарка. Теперь можно выбрать другой.');
-    renderSelectedGift();
+    state.cancelGift = null;
+    state.cancelTrigger = null;
+    showToast('Вы отказались от одного подарка. Остальные ваши подарки сохранены.');
+    renderSelectedGifts();
     renderGifts();
   } catch (error) {
-    showToast('Не получилось отказаться от подарка. Попробуйте еще раз.');
-    console.error(error);
+    if (error.code === GIFT_NOT_OWNED) {
+      if (error.reservation) state.reservations.set(gift.id, error.reservation);
+      else state.reservations.delete(gift.id);
+      elements.cancelSelectionModal.classList.add('hidden');
+      state.cancelGift = null;
+      state.cancelTrigger = null;
+      renderSelectedGifts();
+      renderGifts();
+      showToast('Этот подарок больше не закреплён за вашим профилем.');
+    } else {
+      showToast('Не получилось отказаться от подарка. Попробуйте ещё раз.');
+      console.error(error);
+    }
   } finally {
     state.pendingCancel = false;
+    elements.keepGiftButton.disabled = false;
     elements.confirmCancelGiftButton.disabled = false;
     elements.confirmCancelGiftButton.textContent = 'Да, отказаться';
   }
