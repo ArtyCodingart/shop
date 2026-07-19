@@ -384,9 +384,10 @@ input:focus {
 }
 
 .gift-card {
+  position: relative;
   min-height: 100%;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 168px 1fr auto;
   overflow: hidden;
   animation: cardIn 0.45s ease both;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
@@ -398,15 +399,12 @@ input:focus {
 }
 
 .gift-card-main {
-  width: 100%;
-  min-height: 100%;
-  display: grid;
-  grid-template-rows: 168px 1fr;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   border: 0;
   padding: 0;
-  color: inherit;
   background: transparent;
-  text-align: left;
   cursor: pointer;
 }
 
@@ -468,6 +466,8 @@ input:focus {
 }
 
 .gift-action {
+  position: relative;
+  z-index: 2;
   min-height: 40px;
   width: calc(100% - 24px);
   margin-right: 12px;

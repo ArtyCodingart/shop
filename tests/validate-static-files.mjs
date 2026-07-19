@@ -65,6 +65,7 @@ const requiredHtmlSnippets = [
   '<button class="ghost-button" id="handoffBackButton" type="button">Назад</button>',
   '<button class="primary-action" id="handoffConfirmButton" type="button">Понятно, перейти</button>',
   'id="cancelSelectionModal"',
+  'id="cancelSelectionDialog" tabindex="-1"',
   'id="cancelSelectionText"',
   'id="confirmCancelGiftButton"'
 ];
@@ -77,9 +78,15 @@ for (const snippet of requiredHtmlSnippets) {
 
 const confirmModalIndex = html.indexOf('id="confirmModal"');
 const handoffModalIndex = html.indexOf('id="handoffModal"');
+const cancelSelectionModalIndex = html.indexOf('id="cancelSelectionModal"');
+const cancelSelectionDialogIndex = html.indexOf('id="cancelSelectionDialog"');
 
 if (confirmModalIndex >= handoffModalIndex) {
   throw new Error('handoffModal must follow confirmModal');
+}
+
+if (cancelSelectionDialogIndex <= cancelSelectionModalIndex) {
+  throw new Error('cancelSelectionDialog must be inside cancelSelectionModal');
 }
 
 const scriptSources = Array.from(
@@ -118,7 +125,12 @@ const requiredAppSnippets = [
   "renderSelectedGifts",
   "createGiftCard",
   "gift-card-main",
+  "description.className = 'gift-description'",
   "status.textContent = availabilityText",
+  "mainControl.setAttribute('aria-labelledby'",
+  "mainControl.setAttribute('aria-describedby'",
+  "card.append(image, body, mainControl, action)",
+  "getGiftDomToken",
   "mainControl.addEventListener('click'",
   "action.addEventListener('click'",
   "state.cancelGift",
@@ -127,6 +139,10 @@ const requiredAppSnippets = [
   "finishCancelSelection",
   "trapCancelSelectionFocus",
   "restoreCancelSelectionFocus",
+  "cancelSelectionDialog",
+  "setAttribute('aria-busy', 'true')",
+  "removeAttribute('aria-busy')",
+  "cancelSelectionDialog.focus()",
   "deleteOwnedReservation",
   "runTransaction",
   "pendingLogin",
@@ -169,12 +185,20 @@ if (app.includes('<p class="gift-status">${')) {
   throw new Error('reservation status must be assigned with textContent, not interpolated into markup');
 }
 
+if (app.includes('mainControl.append(image, body)')) {
+  throw new Error('gift-card-main must remain an empty overlay control');
+}
+
 for (const styleSnippet of [
   '.selected-gifts',
   '.selected-gift-grid',
   '.gift-card-main',
   '.unavailable-gift',
   ':not(.unavailable-gift)',
+  'grid-template-rows: 168px 1fr auto',
+  'position: absolute',
+  'inset: 0',
+  'z-index: 2',
   'flex-direction: column',
   'margin-top: auto'
 ]) {

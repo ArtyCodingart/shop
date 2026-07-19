@@ -55,6 +55,7 @@ const elements = {
   cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
   confirmGiftButton: document.querySelector('#confirmGiftButton'),
   cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
+  cancelSelectionDialog: document.querySelector('#cancelSelectionDialog'),
   cancelSelectionText: document.querySelector('#cancelSelectionText'),
   keepGiftButton: document.querySelector('#keepGiftButton'),
   confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
@@ -405,20 +406,23 @@ function createGiftCard(gift, context) {
   const description = document.createElement('p');
   const action = document.createElement('button');
   const availabilityText = getAvailabilityText(reservationState, reservation, isSelectedCard);
+  const domId = `gift-${context}-${getGiftDomToken(gift.id)}`;
 
   card.className = `gift-card${reservationState !== 'free' ? ' reserved' : ''}${reservationState === 'own' ? ' own-gift' : ''}${isSelectedCard ? ' selected-gift-card' : ''}${isDisabled ? ' unavailable-gift' : ''}`;
   card.dataset.giftId = gift.id;
   mainControl.className = 'gift-card-main';
   mainControl.type = 'button';
   mainControl.disabled = isDisabled;
-  mainControl.setAttribute('aria-label', getCardAriaLabel(gift, reservationState, isUnavailable));
   image.src = gift.imageUrl;
   image.alt = gift.title;
   image.loading = 'lazy';
   body.className = 'gift-body';
   topline.className = 'gift-topline';
   category.textContent = gift.category;
+  title.id = `${domId}-title`;
   title.textContent = gift.title;
+  description.id = `${domId}-description`;
+  description.className = 'gift-description';
   description.textContent = gift.description;
   action.className = `gift-action${isSelectedCard ? ' cancel-gift-action' : ''}`;
   action.type = 'button';
@@ -428,14 +432,18 @@ function createGiftCard(gift, context) {
 
   topline.append(category);
   body.append(topline, title, description);
+  const describedBy = [description.id];
   if (availabilityText) {
     const status = document.createElement('p');
+    status.id = `${domId}-status`;
     status.className = 'gift-status';
     status.textContent = availabilityText;
     body.append(status);
+    describedBy.push(status.id);
   }
-  mainControl.append(image, body);
-  card.append(mainControl, action);
+  mainControl.setAttribute('aria-labelledby', title.id);
+  mainControl.setAttribute('aria-describedby', describedBy.join(' '));
+  card.append(image, body, mainControl, action);
 
   const activateMain = () => {
     if (isSelectedCard || reservationState === 'own') {
@@ -482,6 +490,10 @@ function getCardAriaLabel(gift, reservationState, isUnavailable) {
 function getActionAriaLabel(gift, reservationState, isSelectedCard, isUnavailable) {
   if (isSelectedCard) return `Отказаться от подарка: ${gift.title}`;
   return getCardAriaLabel(gift, reservationState, isUnavailable);
+}
+
+function getGiftDomToken(giftId) {
+  return Array.from(String(giftId), (character) => character.codePointAt(0).toString(16)).join('-') || 'empty';
 }
 
 function openMarketLink(gift) {
@@ -583,6 +595,7 @@ function openCancelSelectionModal(gift, trigger) {
   state.cancelGiftId = gift.id;
   state.cancelTrigger = trigger;
   elements.cancelSelectionText.textContent = `Подарок «${gift.title}» снова станет доступен другим гостям. Остальные ваши подарки сохранятся.`;
+  elements.cancelSelectionDialog.removeAttribute('aria-busy');
   elements.cancelSelectionModal.classList.remove('hidden');
   elements.keepGiftButton.focus();
 }
@@ -595,6 +608,12 @@ function closeCancelSelectionModal() {
 
 function trapCancelSelectionFocus(event) {
   if (event.key !== 'Tab' || elements.cancelSelectionModal.classList.contains('hidden')) return;
+
+  if (state.pendingCancel) {
+    event.preventDefault();
+    elements.cancelSelectionDialog.focus();
+    return;
+  }
 
   const controls = Array.from(elements.cancelSelectionModal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'));
   if (controls.length === 0) return;
@@ -615,6 +634,7 @@ function finishCancelSelection({ rerender = false } = {}) {
   const trigger = state.cancelTrigger;
 
   elements.cancelSelectionModal.classList.add('hidden');
+  elements.cancelSelectionDialog.removeAttribute('aria-busy');
   state.cancelGift = null;
   state.cancelGiftId = null;
   state.cancelTrigger = null;
@@ -650,6 +670,8 @@ async function cancelSelectedGift() {
 
   try {
     state.pendingCancel = true;
+    elements.cancelSelectionDialog.setAttribute('aria-busy', 'true');
+    elements.cancelSelectionDialog.focus();
     elements.keepGiftButton.disabled = true;
     elements.confirmCancelGiftButton.disabled = true;
     elements.confirmCancelGiftButton.textContent = 'Отказываемся…';
@@ -677,6 +699,7 @@ async function cancelSelectedGift() {
   } finally {
     const shouldFocusRetry = Boolean(state.cancelGift) && !elements.cancelSelectionModal.classList.contains('hidden');
     state.pendingCancel = false;
+    elements.cancelSelectionDialog.removeAttribute('aria-busy');
     elements.keepGiftButton.disabled = false;
     elements.confirmCancelGiftButton.disabled = false;
     elements.confirmCancelGiftButton.textContent = 'Да, отказаться';

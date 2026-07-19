@@ -121,6 +121,10 @@ class FakeElement {
     return this.attributes.get(name) ?? null;
   }
 
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+
   addEventListener(type, listener) {
     const listeners = this.listeners.get(type) || [];
     listeners.push(listener);
@@ -174,7 +178,7 @@ class FakeElement {
 
 function matches(element, selector) {
   if (selector === 'button') return element.tagName === 'BUTTON';
-  if (/^[a-z]+$/i.test(selector)) return element.tagName === selector.toUpperCase();
+  if (/^[a-z][a-z0-9]*$/i.test(selector)) return element.tagName === selector.toUpperCase();
   if (selector.startsWith('.')) return element.classList.contains(selector.slice(1));
   if (selector.includes('button:not([disabled])')) return element.tagName === 'BUTTON' && !element.disabled;
   return false;
@@ -215,15 +219,17 @@ function createFakeDocument() {
 
   for (const selector of [
     '#loginForm', '#registerForm', '#accountTrigger', '#logoutButton', '#confirmModal',
-    '#cancelConfirmButton', '#confirmGiftButton', '#cancelSelectionModal', '#keepGiftButton',
+    '#cancelConfirmButton', '#confirmGiftButton', '#cancelSelectionModal', '#cancelSelectionDialog', '#keepGiftButton',
     '#confirmCancelGiftButton'
   ]) {
-    const tagName = selector.includes('Form') ? 'form' : selector.includes('Modal') ? 'div' : 'button';
+    const tagName = selector.includes('Form') ? 'form' : selector.includes('Dialog') ? 'article' : selector.includes('Modal') ? 'div' : 'button';
     elements.set(selector, new FakeElement(tagName, document));
   }
 
   const cancelModal = elements.get('#cancelSelectionModal');
-  cancelModal.append(elements.get('#keepGiftButton'), elements.get('#confirmCancelGiftButton'));
+  const cancelDialog = elements.get('#cancelSelectionDialog');
+  cancelDialog.append(elements.get('#keepGiftButton'), elements.get('#confirmCancelGiftButton'));
+  cancelModal.append(cancelDialog);
   return document;
 }
 
@@ -295,6 +301,37 @@ test('renders a hostile reservation display name as text, never markup', () => {
 
   assert.equal(status.textContent, `Уже покупает ${hostileName}.`);
   assert.equal(card.querySelectorAll('img').length, 1, 'hostile status must not create another image element');
+});
+
+test('card main control is an empty sibling overlay with resolvable unique ARIA references', () => {
+  const app = loadApp();
+  const sharedGift = gift({ id: 'gift / один' });
+  app.state.profile = { phone: '77000000000' };
+  app.state.firebaseReady = true;
+  app.state.reservationsFailed = false;
+  app.state.reservations = new Map([[sharedGift.id, { phone: '78000000000', displayName: 'Гость' }]]);
+
+  const catalogCard = app.createGiftCard(sharedGift, 'catalog');
+  app.state.reservations.set(sharedGift.id, { phone: app.state.profile.phone, displayName: 'Вы' });
+  const selectedCard = app.createGiftCard(sharedGift, 'selected');
+  const main = catalogCard.querySelector('.gift-card-main');
+  const action = catalogCard.querySelector('.gift-action');
+  const title = catalogCard.querySelector('h2');
+  const description = catalogCard.querySelector('.gift-description');
+  const status = catalogCard.querySelector('.gift-status');
+
+  assert.equal(main.children.length, 0, 'main button must not contain block or heading content');
+  assert.equal(main.parentNode, catalogCard);
+  assert.equal(action.parentNode, catalogCard);
+  assert.equal(title.parentNode, catalogCard.querySelector('.gift-body'));
+  assert.equal(description.parentNode, title.parentNode);
+  assert.equal(status.parentNode, title.parentNode);
+  assert.equal(main.getAttribute('aria-labelledby'), title.id);
+  assert.deepEqual(main.getAttribute('aria-describedby').split(' '), [description.id, status.id]);
+  assert.equal(findById(catalogCard, title.id), title);
+  assert.equal(findById(catalogCard, description.id), description);
+  assert.equal(findById(catalogCard, status.id), status);
+  assert.notEqual(selectedCard.querySelector('h2').id, title.id, 'selected and catalog copies need unique ids');
 });
 
 for (const activation of ['click', 'Enter', ' ']) {
@@ -401,6 +438,39 @@ test('transient cancellation failure keeps the modal open, focused, and retryabl
   assert.equal(app.elements.confirmCancelGiftButton.disabled, false);
 });
 
+test('pending cancellation focuses a busy dialog and traps Tab until the transaction settles', async () => {
+  const app = loadApp();
+  const { selectedGift, card } = prepareOwnedCard(app);
+  const transaction = deferred();
+  app.openCancelSelectionModal(selectedGift, card.querySelector('.gift-action'));
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    runTransaction: () => transaction.promise
+  };
+
+  const cancellation = app.cancelSelectedGift();
+
+  assert.equal(app.state.pendingCancel, true);
+  assert.equal(app.elements.keepGiftButton.disabled, true);
+  assert.equal(app.elements.confirmCancelGiftButton.disabled, true);
+  assert.ok(app.elements.cancelSelectionDialog, 'app must retain the dialog focus target');
+  assert.equal(app.elements.cancelSelectionDialog.getAttribute('aria-busy'), 'true');
+  assert.equal(app.document.activeElement, app.elements.cancelSelectionDialog);
+
+  const tab = createEvent('keydown', { key: 'Tab' });
+  app.elements.cancelSelectionModal.dispatchEvent(tab);
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(app.document.activeElement, app.elements.cancelSelectionDialog);
+
+  transaction.reject(new Error('network unavailable'));
+  await cancellation;
+
+  assert.equal(app.elements.cancelSelectionDialog.getAttribute('aria-busy'), null);
+  assert.equal(app.elements.keepGiftButton.disabled, false);
+  assert.equal(app.elements.confirmCancelGiftButton.disabled, false);
+  assert.equal(app.document.activeElement, app.elements.confirmCancelGiftButton);
+});
+
 test('owned reservation transaction deletes exactly the requested reservation', async () => {
   assert.equal(typeof registryCore.deleteOwnedReservation, 'function');
   const targetRef = { id: 'target' };
@@ -476,4 +546,23 @@ function snapshot(data) {
     exists: () => data !== null,
     data: () => data
   };
+}
+
+function findById(root, id) {
+  if (root.id === id) return root;
+  for (const child of root.children) {
+    const match = findById(child, id);
+    if (match) return match;
+  }
+  return null;
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
