@@ -1,0 +1,152 @@
+<style>
+  .selected-preview {
+    padding: 24px;
+    border: 1px solid rgba(92, 58, 38, 0.16);
+    border-radius: 14px;
+    color: #31241b;
+    background: linear-gradient(135deg, rgba(255, 250, 241, 0.98), rgba(239, 224, 202, 0.88));
+  }
+
+  .selected-preview h3,
+  .selected-preview p {
+    margin: 0;
+  }
+
+  .selected-preview > p {
+    margin-top: 7px;
+    color: #7d6d5f;
+  }
+
+  .selected-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .selected-card {
+    min-height: 100%;
+    display: grid;
+    grid-template-rows: 145px 1fr;
+    overflow: hidden;
+    border: 1px solid rgba(92, 58, 38, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 250, 241, 0.98);
+    box-shadow: 0 12px 28px rgba(91, 65, 43, 0.12);
+  }
+
+  .selected-card img {
+    width: 100%;
+    height: 145px;
+    object-fit: cover;
+  }
+
+  .selected-card-body {
+    min-height: 215px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .selected-card small {
+    color: #7d6d5f;
+    font-weight: 700;
+  }
+
+  .selected-card strong {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .selected-card p {
+    color: #7d6d5f;
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+
+  .selected-card .own-label {
+    color: #9b6334;
+    font-size: 0.86rem;
+    font-weight: 850;
+  }
+
+  .selected-card button {
+    width: 100%;
+    min-height: 36px;
+    margin-top: auto;
+    border: 1px solid rgba(122, 58, 41, 0.22);
+    border-radius: 7px;
+    color: #7a3a29;
+    background: rgba(255, 241, 229, 0.86);
+    font-weight: 800;
+  }
+
+  .alignment-note {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 16px;
+    color: #9b6334;
+    font-weight: 800;
+  }
+
+  @media (max-width: 760px) {
+    .selected-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+
+<h2>Карточки «Ваши подарки» — версия 2</h2>
+<p class="subtitle">Кнопки отказа образуют ровную нижнюю линию независимо от количества текста.</p>
+
+<section class="selected-preview">
+  <h3>Ваши подарки</h3>
+  <p>Вы планируете купить эти подарки. Нажмите на карточку, чтобы перейти в магазин.</p>
+
+  <div class="selected-grid">
+    <article class="selected-card">
+      <img src="https://images.unsplash.com/photo-1586105251261-72a756497a12?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Видеоняня">
+      <div class="selected-card-body">
+        <small>Техника</small>
+        <strong>Видеоняня</strong>
+        <p>Поможет спокойно наблюдать за малышом во время сна.</p>
+        <span class="own-label">Вы покупаете этот подарок</span>
+        <button type="button">Отказаться</button>
+      </div>
+    </article>
+
+    <article class="selected-card">
+      <img src="https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Запас подгузников Newborn">
+      <div class="selected-card-body">
+        <small>Уход</small>
+        <strong>Запас подгузников Newborn</strong>
+        <p>Практичный подарок, который точно пригодится в первые недели и потребует чуть больше места для описания.</p>
+        <span class="own-label">Вы покупаете этот подарок</span>
+        <button type="button">Отказаться</button>
+      </div>
+    </article>
+
+    <article class="selected-card">
+      <img src="https://images.unsplash.com/photo-1603245729422-01da973cf88d?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Набор для купания">
+      <div class="selected-card-body">
+        <small>Купание</small>
+        <strong>Набор для купания</strong>
+        <p>Ванночка, полотенце и аксессуары.</p>
+        <span class="own-label">Вы покупаете этот подарок</span>
+        <button type="button">Отказаться</button>
+      </div>
+    </article>
+  </div>
+
+  <div class="alignment-note">↓ Все кнопки закреплены у нижнего края карточек</div>
+</section>
+
+<div class="options" style="margin-top:20px">
+  <div class="option" data-choice="approve-bottom-aligned-cancel" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Так подходит</h3>
+      <p>Сохраняем одинаковую высоту карточек и всегда прижимаем «Отказаться» вниз.</p>
+    </div>
+  </div>
+</div>

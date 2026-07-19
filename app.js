@@ -28,7 +28,10 @@ const state = {
   firebaseApi: null
 };
 
-const elements = {
+let elements;
+
+function collectElements() {
+  return {
   bootView: document.querySelector('#bootView'),
   loginView: document.querySelector('#loginView'),
   registerView: document.querySelector('#registerView'),
@@ -68,12 +71,18 @@ const elements = {
   cancelSelectionText: document.querySelector('#cancelSelectionText'),
   keepGiftButton: document.querySelector('#keepGiftButton'),
   confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
-  toast: document.querySelector('#toast')
-};
+    toast: document.querySelector('#toast')
+  };
+}
 
-init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+} else {
+  init();
+}
 
 async function init() {
+  elements = collectElements();
   bindEvents();
   await loadGifts();
   await setupFirebase();

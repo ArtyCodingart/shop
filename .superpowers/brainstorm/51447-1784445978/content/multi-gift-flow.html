@@ -1,0 +1,240 @@
+<style>
+  .registry-preview {
+    --ink: #31241b;
+    --muted: #7d6d5f;
+    --paper: #fffaf1;
+    --line: rgba(92, 58, 38, 0.16);
+    --caramel: #9b6334;
+    --honey: #d7a252;
+    color: var(--ink);
+    display: grid;
+    gap: 28px;
+  }
+
+  .registry-section {
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 250, 241, 0.98), rgba(239, 224, 202, 0.88));
+  }
+
+  .registry-section h3,
+  .registry-section p {
+    margin: 0;
+  }
+
+  .registry-section .hint {
+    margin-top: 7px;
+    color: var(--muted);
+  }
+
+  .gift-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .gift-mini {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 250, 241, 0.96);
+    box-shadow: 0 12px 28px rgba(91, 65, 43, 0.12);
+  }
+
+  .gift-mini img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+  }
+
+  .gift-mini-body {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .gift-mini small {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .gift-mini strong {
+    font-size: 1rem;
+  }
+
+  .gift-mini .own-label {
+    color: var(--caramel);
+    font-weight: 800;
+  }
+
+  .gift-mini button {
+    min-height: 34px;
+    border: 1px solid rgba(122, 58, 41, 0.22);
+    border-radius: 7px;
+    color: #7a3a29;
+    background: rgba(255, 241, 229, 0.86);
+    font-weight: 800;
+  }
+
+  .modal-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .flow-arrow {
+    color: var(--caramel);
+    font-size: 2rem;
+    font-weight: 900;
+  }
+
+  .dialog-demo {
+    min-height: 300px;
+    display: grid;
+    align-content: start;
+    gap: 13px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper);
+    box-shadow: 0 16px 36px rgba(91, 65, 43, 0.14);
+  }
+
+  .dialog-demo .step {
+    color: var(--caramel);
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .dialog-demo p {
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .dialog-actions {
+    display: flex;
+    gap: 9px;
+    margin-top: auto;
+  }
+
+  .dialog-actions button {
+    flex: 1;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: white;
+    font-weight: 800;
+  }
+
+  .dialog-actions .primary {
+    border: 0;
+    color: white;
+    background: linear-gradient(135deg, #5c3a26, #9b6334);
+  }
+
+  .approval-card {
+    margin-top: 4px;
+  }
+
+  @media (max-width: 760px) {
+    .gift-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .modal-flow { grid-template-columns: 1fr; }
+    .flow-arrow { transform: rotate(90deg); text-align: center; }
+  }
+</style>
+
+<h2>Несколько подарков: согласованный интерфейс</h2>
+<p class="subtitle">Проверьте плотность карточек, индивидуальный отказ и два шага перед переходом в магазин.</p>
+
+<div class="registry-preview">
+  <section class="registry-section">
+    <h3>Ваши подарки</h3>
+    <p class="hint">Вы планируете купить эти подарки. Нажмите на карточку, чтобы перейти в магазин.</p>
+    <div class="gift-row">
+      <article class="gift-mini">
+        <img src="https://images.unsplash.com/photo-1586105251261-72a756497a12?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Видеоняня">
+        <div class="gift-mini-body">
+          <small>Техника</small>
+          <strong>Видеоняня</strong>
+          <span class="own-label">Вы покупаете этот подарок</span>
+          <button type="button">Отказаться</button>
+        </div>
+      </article>
+      <article class="gift-mini">
+        <img src="https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Запас подгузников Newborn">
+        <div class="gift-mini-body">
+          <small>Уход</small>
+          <strong>Запас подгузников Newborn</strong>
+          <span class="own-label">Вы покупаете этот подарок</span>
+          <button type="button">Отказаться</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="registry-section">
+    <h3>Все подарки</h3>
+    <p class="hint">Выбранный подарок остаётся в общем каталоге и явно показывает владельца.</p>
+    <div class="gift-row">
+      <article class="gift-mini">
+        <img src="https://images.unsplash.com/photo-1586105251261-72a756497a12?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Видеоняня">
+        <div class="gift-mini-body">
+          <small>Техника</small>
+          <strong>Видеоняня</strong>
+          <span class="own-label">Этот подарок покупаете вы</span>
+          <button type="button">Перейти в магазин</button>
+        </div>
+      </article>
+      <article class="gift-mini">
+        <img src="https://images.unsplash.com/photo-1603245729422-01da973cf88d?auto=format&amp;fit=crop&amp;w=600&amp;q=75" alt="Набор для купания">
+        <div class="gift-mini-body">
+          <small>Купание</small>
+          <strong>Набор для купания</strong>
+          <span>Свободен для выбора</span>
+          <button type="button">Я хочу купить</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="registry-section">
+    <h3>Путь нового выбора</h3>
+    <p class="hint">Карточка и кнопка «Я хочу купить» запускают одинаковый сценарий.</p>
+    <div class="modal-flow" style="margin-top:18px">
+      <article class="dialog-demo">
+        <span class="step">Шаг 1</span>
+        <h3>Хотите купить этот подарок?</h3>
+        <p>Набор для купания</p>
+        <div class="dialog-actions">
+          <button type="button">Нет</button>
+          <button class="primary" type="button">Да</button>
+        </div>
+      </article>
+      <div class="flow-arrow">→</div>
+      <article class="dialog-demo">
+        <span class="step">Шаг 2</span>
+        <h3>Как это работает</h3>
+        <p>После подтверждения мы закрепим подарок за вами и автоматически откроем магазин. Там нужно самостоятельно оформить и оплатить покупку.</p>
+        <p>Если подарок уже заняли, переход не произойдёт и мы сообщим об этом.</p>
+        <div class="dialog-actions">
+          <button type="button">Назад</button>
+          <button class="primary" type="button">Понятно, перейти</button>
+        </div>
+      </article>
+    </div>
+  </section>
+</div>
+
+<div class="options approval-card">
+  <div class="option" data-choice="approve-multi-gift-ui" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Согласовать это направление</h3>
+      <p>Карточки остаются компактными, а подробное объяснение находится во втором окне.</p>
+    </div>
+  </div>
+</div>
