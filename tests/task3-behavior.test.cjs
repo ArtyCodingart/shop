@@ -262,6 +262,7 @@ function createFakeDocument() {
 function loadApp() {
   const document = createFakeDocument();
   let marketOpenCount = 0;
+  let nextMarketAssignError = null;
   const marketAssignments = [];
   const timers = [];
   const sandbox = {
@@ -270,7 +271,14 @@ function loadApp() {
     localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
     location: {
       protocol: 'https:',
-      assign(url) { marketAssignments.push(url); }
+      assign(url) {
+        if (nextMarketAssignError) {
+          const error = nextMarketAssignError;
+          nextMarketAssignError = null;
+          throw error;
+        }
+        marketAssignments.push(url);
+      }
     },
     giftRegistryFirebase: { config: {}, isConfigured: false },
     giftRegistryCore: registryCore,
@@ -309,6 +317,7 @@ function loadApp() {
     document,
     getMarketOpenCount: () => marketOpenCount + marketAssignments.length,
     getMarketAssignments: () => [...marketAssignments],
+    failNextMarketAssign(error) { nextMarketAssignError = error; },
     getTimers: () => timers.filter((timer) => !timer.cleared),
     runTimer(delay) {
       const timer = timers.find((candidate) => !candidate.cleared && candidate.delay === delay);
@@ -700,13 +709,67 @@ test('final confirmation reserves transactionally, updates UI, waits exactly 700
   assert.equal(app.document.querySelector('#handoffStatus').textContent, 'Подарок закреплён. Открываем магазин…');
   assert.equal(app.document.querySelector('#handoffStatus').classList.contains('hidden'), false);
   assert.equal(app.state.pendingReservation, true);
-  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), 'true');
+  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), null);
+  assert.equal(app.document.querySelector('#handoffBackButton').disabled, true);
+  assert.equal(app.document.querySelector('#handoffConfirmButton').disabled, true);
   assert.equal(app.document.activeElement, app.document.querySelector('#handoffDialog'));
 
   app.runTimer(700);
   await reservation;
 
   assert.deepEqual(app.getMarketAssignments(), [freeGift.marketUrl]);
+});
+
+test('an assign failure keeps an owned reservation retryable without writing it twice', async () => {
+  const app = loadApp();
+  const { freeGift, card } = prepareFreeCard(app);
+  let transactionRuns = 0;
+  let writes = 0;
+  app.state.firebaseApi = {
+    doc: (firestore, collection, id) => ({ collection, id }),
+    serverTimestamp: () => 'timestamp',
+    runTransaction: async (firestore, update) => {
+      transactionRuns += 1;
+      return update({
+        async get() { return snapshot(null); },
+        set() { writes += 1; }
+      });
+    }
+  };
+  app.failNextMarketAssign(new Error('navigation unavailable'));
+  app.openConfirmModal(freeGift, card.querySelector('.gift-card-main'));
+  app.openHandoffModal();
+
+  const firstAttempt = app.reserveAndOpenMarketplace();
+  await waitForTimer(app, 700);
+  app.runTimer(700);
+  await firstAttempt;
+
+  assert.equal(transactionRuns, 1);
+  assert.equal(writes, 1);
+  assert.equal(app.getMarketAssignments().length, 0);
+  assert.equal(app.state.reservations.get(freeGift.id).phone, app.state.profile.phone);
+  assert.equal(app.state.purchaseGift, freeGift);
+  assert.equal(app.document.querySelector('#handoffModal').classList.contains('hidden'), false);
+  assert.equal(app.document.querySelector('#handoffDialog').getAttribute('aria-busy'), null);
+  assert.equal(app.document.querySelector('#handoffBackButton').disabled, false);
+  assert.equal(app.document.querySelector('#handoffConfirmButton').disabled, false);
+  assert.equal(app.document.activeElement, app.document.querySelector('#handoffConfirmButton'));
+  assert.equal(
+    app.document.querySelector('#handoffStatus').textContent,
+    'Подарок закреплён, но магазин не открылся. Попробуйте перейти ещё раз.'
+  );
+
+  const retry = app.reserveAndOpenMarketplace();
+  await waitForTimer(app, 700);
+  assert.equal(transactionRuns, 1, 'retrying navigation must not rerun the reservation transaction');
+  assert.equal(writes, 1, 'retrying navigation must not write the owned reservation again');
+  app.runTimer(700);
+  await retry;
+
+  assert.deepEqual(app.getMarketAssignments(), [freeGift.marketUrl]);
+  assert.equal(transactionRuns, 1);
+  assert.equal(writes, 1);
 });
 
 test('pending reservation blocks duplicate, Back, backdrop, Escape, and Tab escape; a network error remains retryable', async () => {

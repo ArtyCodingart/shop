@@ -674,6 +674,7 @@ async function reserveAndOpenMarketplace() {
 
   const { doc, runTransaction, serverTimestamp } = state.firebaseApi;
   const reservationRef = doc(state.firestore, 'reservations', gift.id);
+  let reservationReady = getReservationState(state.reservations.get(gift.id), profile.phone) === 'own';
   let navigating = false;
 
   try {
@@ -684,40 +685,44 @@ async function reserveAndOpenMarketplace() {
     elements.handoffConfirmButton.disabled = true;
     elements.handoffConfirmButton.textContent = 'Закрепляем…';
 
-    await runTransaction(state.firestore, async (transaction) => {
-      const snapshot = await transaction.get(reservationRef);
-      if (snapshot.exists()) {
-        const error = new Error('Gift is already reserved');
-        error.code = GIFT_ALREADY_RESERVED;
-        error.reservation = snapshot.data();
-        throw error;
-      }
+    if (!reservationReady) {
+      await runTransaction(state.firestore, async (transaction) => {
+        const snapshot = await transaction.get(reservationRef);
+        if (snapshot.exists()) {
+          const error = new Error('Gift is already reserved');
+          error.code = GIFT_ALREADY_RESERVED;
+          error.reservation = snapshot.data();
+          throw error;
+        }
 
-      transaction.set(reservationRef, {
+        transaction.set(reservationRef, {
+          phone: profile.phone,
+          giftId: gift.id,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          displayName: profile.displayName,
+          createdAt: serverTimestamp()
+        });
+      });
+
+      state.reservations.set(gift.id, {
         phone: profile.phone,
         giftId: gift.id,
         firstName: profile.firstName,
         lastName: profile.lastName,
-        displayName: profile.displayName,
-        createdAt: serverTimestamp()
+        displayName: profile.displayName
       });
-    });
-
-    state.reservations.set(gift.id, {
-      phone: profile.phone,
-      giftId: gift.id,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      displayName: profile.displayName
-    });
-    renderSelectedGifts();
-    renderGifts();
+      reservationReady = true;
+      renderSelectedGifts();
+      renderGifts();
+    }
+    elements.handoffDialog.removeAttribute('aria-busy');
     elements.handoffStatus.textContent = 'Подарок закреплён. Открываем магазин…';
     elements.handoffStatus.classList.remove('hidden');
     elements.handoffConfirmButton.textContent = 'Открываем…';
-    navigating = true;
     await wait(700);
     window.location.assign(gift.marketUrl);
+    navigating = true;
   } catch (error) {
     if (error.code === GIFT_ALREADY_RESERVED) {
       state.reservations.set(gift.id, error.reservation);
@@ -728,9 +733,12 @@ async function reserveAndOpenMarketplace() {
       resetPurchaseFlow();
       showToast('Этот подарок уже выбрали. Посмотрите другие варианты.');
     } else {
-      elements.handoffStatus.textContent = 'Не получилось закрепить подарок. Проверьте соединение и попробуйте ещё раз.';
+      const message = reservationReady
+        ? 'Подарок закреплён, но магазин не открылся. Попробуйте перейти ещё раз.'
+        : 'Не получилось закрепить подарок. Проверьте соединение и попробуйте ещё раз.';
+      elements.handoffStatus.textContent = message;
       elements.handoffStatus.classList.remove('hidden');
-      showToast('Не получилось закрепить подарок. Проверьте соединение и попробуйте ещё раз.');
+      showToast(message);
       console.error(error);
     }
   } finally {
