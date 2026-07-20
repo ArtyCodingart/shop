@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move the gift catalog from `gifts.json` to Firebase Firestore and add a protected administration page for creating, editing, and deleting gifts.
+Store the gift catalog exclusively in Firebase Firestore and provide a protected administration page for creating, editing, and deleting gifts.
 
 ## Administration Route
 
@@ -28,9 +28,9 @@ Firestore collection `gifts` is the sole catalog source of truth. Each document 
 
 The document ID is immutable after creation so existing reservation references remain valid. New gifts receive the next available `sortOrder`.
 
-## Initial Migration
+## Empty Catalog
 
-After the administrator signs in, the page checks the `gifts` collection. If it is empty, it reads the existing `gifts.json` and imports every gift in its current order. The JSON file remains in the repository only as the initial migration source; the public catalog does not fall back to it after migration.
+The administration page never creates or imports gifts automatically. If the Firestore `gifts` collection is empty, both the administration page and public catalog show an empty state. The administrator adds the first and subsequent gifts through the same create form.
 
 ## Administration Interface
 
@@ -52,8 +52,8 @@ The client repeats the same checks for clear feedback, but Firestore rules are t
 
 ## Error Handling
 
-Authentication, import, load, save, and delete errors are shown inside the administration page. Failed writes keep the form open. An empty catalog is shown explicitly. Signing out returns to the login form.
+Authentication, load, save, and delete errors are shown inside the administration page. Failed writes keep the form open. An empty catalog is shown explicitly. Signing out returns to the login form.
 
 ## Scope
 
-The implementation is local only: no commits and no new automated tests. Existing `gifts.json` remains as migration data, while Firestore becomes the runtime catalog source.
+The implementation is local only: no commits and no new automated tests. `gifts.json` is removed; Firestore is the only catalog source.
