@@ -1,6 +1,6 @@
 # Baby Gift Registry
 
-Static GitHub Pages site where friends can choose multiple baby gifts. The public gift catalog lives in `gifts.json`; shared reservations live in Firebase Firestore.
+Static GitHub Pages site where friends can choose multiple baby gifts. The public gift catalog and shared reservations live in Firebase Firestore.
 
 Guests log in with a phone number. The app stores only that phone number in `localStorage`; names are loaded from Firestore user documents, while `reservations/{giftId}` is the source of truth for every selected gift. A guest can release one reservation without affecting their other gifts.
 
@@ -23,7 +23,7 @@ Firestore collection `gifts` is the source of truth for the public catalog. Open
 
 Sign in with the Firebase Authentication administrator account `arty.codingart@gmail.com`. The page supports adding, editing, and deleting gifts. A reserved gift cannot be deleted until its reservation is released.
 
-On the first authorized login, an empty Firestore collection is populated from `gifts.json`. The JSON file is retained only as initial migration data. Each gift contains:
+An empty Firestore collection stays empty until the administrator adds the first gift. Each Firestore gift contains:
 
 - `id`
 - `title`
@@ -39,7 +39,6 @@ Repository validation commands:
 ```bash
 node --test tests/task3-behavior.test.cjs
 node --test tests/registry-core.test.cjs
-node tests/validate-gifts.mjs
 node tests/validate-static-files.mjs
 node tests/validate-pages-workflow.mjs
 ```

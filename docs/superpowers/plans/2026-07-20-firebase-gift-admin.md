@@ -2,9 +2,9 @@
 
 > **For agentic workers:** Execute this plan task-by-task. The user explicitly requested no new tests and no commits, so test-writing and commit steps are intentionally omitted.
 
-**Goal:** Store gifts in Firestore and provide an authenticated `/api/gifts/` administration page for importing, creating, updating, and safely deleting gifts.
+**Goal:** Store gifts only in Firestore and provide an authenticated `/api/gifts/` administration page for creating, updating, and safely deleting gifts.
 
-**Architecture:** The public catalog and admin page share the existing Firebase project. `gifts/{giftId}` becomes the runtime source of truth; public clients may read it, while Firestore rules allow writes only to the configured Firebase Authentication email. The admin page imports `gifts.json` once when the collection is empty and prevents deletion whenever `reservations/{giftId}` exists.
+**Architecture:** The public catalog and admin page share the existing Firebase project. `gifts/{giftId}` is the only catalog source; public clients may read it, while Firestore rules allow writes only to the configured Firebase Authentication email. An empty collection stays empty until the administrator creates a gift, and deletion is prevented whenever `reservations/{giftId}` exists.
 
 **Tech Stack:** Static HTML/CSS/JavaScript, Firebase JavaScript SDK 10.12.4, Firebase Authentication, Cloud Firestore, GitHub Pages.
 
@@ -132,7 +132,7 @@ All scripts stay at the end of `<body>` or use `defer`, and all form controls ha
 
 Create a responsive layout matching the registry palette. The desktop gift list uses a compact table/card hybrid; mobile stacks image, content, and actions. Provide distinct styles for loading, errors, destructive actions, disabled deletion, dialogs, form validation, and empty state.
 
-### Task 4: Implement Firebase Authentication And Initial Import
+### Task 4: Implement Firebase Authentication And Realtime Data
 
 **Files:**
 - Create: `api/gifts/admin.js`
@@ -149,22 +149,7 @@ const ADMIN_EMAIL = 'arty.codingart@gmail.com';
 
 Use `signInWithEmailAndPassword()` for the login form, `signOut()` for logout, and `onAuthStateChanged()` to switch views. If an authenticated user has another email, immediately sign out and show `У этого аккаунта нет доступа.` Never store or prefill the password.
 
-- [ ] **Step 3: Import `gifts.json` only into an empty collection**
-
-After authorized authentication, query `gifts` with `limit(1)`. If empty, fetch `../../gifts.json`, validate its array shape, and write all records with a Firestore batch:
-
-```js
-batch.set(doc(firestore, 'gifts', gift.id), {
-  ...gift,
-  sortOrder: index,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp()
-});
-```
-
-Show `Импортируем текущий каталог…` during the operation. Do not import if any gift document already exists.
-
-- [ ] **Step 4: Subscribe to gifts and reservations**
+- [ ] **Step 3: Subscribe to gifts and reservations**
 
 Subscribe to ordered gifts and the reservation collection. Store both in local state, then render every gift with its preview, fields, edit action, and deletion state. A matching reservation disables deletion and displays `Закреплён за: {displayName}`.
 
@@ -191,7 +176,7 @@ Disable the delete action when the live reservation map contains the gift ID. On
 
 - [ ] **Step 5: Preserve usable pending and error states**
 
-Disable repeated submissions while a login, save, import, or delete operation is pending. Restore buttons after failures, keep forms open for correction, focus the first invalid field, and close dialogs only after successful writes.
+Disable repeated submissions while a login, save, or delete operation is pending. Restore buttons after failures, keep forms open for correction, focus the first invalid field, and close dialogs only after successful writes.
 
 ### Task 6: Document Setup And Perform Manual Verification
 
@@ -200,9 +185,13 @@ Disable repeated submissions while a login, save, import, or delete operation is
 
 - [ ] **Step 1: Document the new catalog source and route**
 
-Replace the JSON editing instructions with Firestore/admin instructions. Document local `/api/gifts/`, deployed `/shop/api/gifts/`, Firebase Authentication Email/Password, the allowed administrator account, one-time import behavior, and the required Firestore rules deployment. Do not document the password.
+Replace the JSON editing instructions with Firestore/admin instructions. Document local `/api/gifts/`, deployed `/shop/api/gifts/`, Firebase Authentication Email/Password, the allowed administrator account, empty-catalog behavior, and the required Firestore rules deployment. Do not document the password.
 
-- [ ] **Step 2: Perform syntax and HTTP checks without adding tests**
+- [ ] **Step 2: Remove the legacy JSON catalog**
+
+Delete `gifts.json`, remove `node tests/validate-gifts.mjs` from `.github/workflows/pages.yml` and README validation commands, and leave `tests/validate-gifts.mjs` unused for historical reference. Do not add or run tests.
+
+- [ ] **Step 3: Perform syntax and HTTP checks without adding tests**
 
 Run only non-test diagnostics:
 
@@ -214,10 +203,10 @@ curl -I http://127.0.0.1:4173/api/gifts/
 
 Expected: JavaScript syntax checks exit `0`; the admin route responds `200`.
 
-- [ ] **Step 3: Verify the authenticated workflow manually**
+- [ ] **Step 4: Verify the authenticated workflow manually**
 
-Open `/api/gifts/`, sign in, confirm the initial ten gifts import once, add a gift, edit it, and delete it. Reserve another gift through the public catalog and confirm its admin delete button is disabled with the guest name. Confirm public catalog changes appear without reload and that logout returns to the login form.
+Open `/api/gifts/`, sign in, confirm an empty collection remains empty, then add a gift, edit it, and delete it. Reserve another gift through the public catalog and confirm its admin delete button is disabled with the guest name. Confirm public catalog changes appear without reload and that logout returns to the login form.
 
-- [ ] **Step 4: Leave work uncommitted**
+- [ ] **Step 5: Leave work uncommitted**
 
 Inspect `git status --short` and report all modified/created files. Do not stage or commit anything.

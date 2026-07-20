@@ -28,9 +28,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate gift catalog
-        run: node tests/validate-gifts.mjs
-
       - name: Validate static app files
         run: node tests/validate-static-files.mjs
 

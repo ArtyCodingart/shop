@@ -8,16 +8,13 @@ import {
 import {
   collection,
   doc,
-  getDocs,
   getFirestore,
-  limit,
   onSnapshot,
   orderBy,
   query,
   runTransaction,
   serverTimestamp,
-  updateDoc,
-  writeBatch
+  updateDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
 const ADMIN_EMAIL = 'arty.codingart@gmail.com';
@@ -72,7 +69,6 @@ const state = {
   editingGiftId: null,
   deletingGift: null,
   pendingLogin: false,
-  pendingImport: false,
   pendingSave: false,
   pendingDelete: false,
   unsubscribers: []
@@ -169,14 +165,7 @@ async function handleAuthState(user) {
 
   state.user = user;
   showAdminView();
-
-  try {
-    await importInitialGifts();
-    subscribeAdminData();
-  } catch (error) {
-    showAdminStatus(getFirestoreErrorMessage(error, 'Не удалось подготовить каталог.'), 'error');
-    console.error(error);
-  }
+  subscribeAdminData();
 }
 
 async function handleLogout() {
@@ -204,57 +193,6 @@ function showAdminView() {
   elements.adminView.classList.remove('hidden');
   elements.adminIdentity.textContent = state.user.email;
   showAdminStatus('Загружаем каталог…');
-}
-
-async function importInitialGifts() {
-  if (state.pendingImport) return;
-
-  const firstGift = await getDocs(query(collection(state.firestore, 'gifts'), limit(1)));
-  if (!firstGift.empty) return;
-
-  try {
-    state.pendingImport = true;
-    elements.addGiftButton.disabled = true;
-    showAdminStatus('Импортируем текущий каталог…');
-
-    const response = await fetch(new URL('../../gifts.json', import.meta.url), { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Gift import failed: ${response.status}`);
-
-    const gifts = await response.json();
-    if (!Array.isArray(gifts) || gifts.length === 0 || !gifts.every(isValidImportGift)) {
-      throw new Error('Gift import contains invalid data');
-    }
-
-    const batch = writeBatch(state.firestore);
-    gifts.forEach((gift, index) => {
-      batch.set(doc(state.firestore, 'gifts', gift.id), {
-        id: gift.id,
-        title: gift.title,
-        category: gift.category,
-        price: gift.price,
-        description: gift.description,
-        details: gift.details,
-        marketUrl: gift.marketUrl,
-        imageUrl: gift.imageUrl,
-        sortOrder: index,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    });
-    await batch.commit();
-    showToast(`Импортировано подарков: ${gifts.length}.`);
-  } finally {
-    state.pendingImport = false;
-    elements.addGiftButton.disabled = false;
-  }
-}
-
-function isValidImportGift(gift) {
-  return gift &&
-    GIFT_ID_PATTERN.test(String(gift.id)) &&
-    ['title', 'category', 'price', 'description', 'details'].every((field) => String(gift[field] || '').trim()) &&
-    isHttpUrl(gift.marketUrl) &&
-    isHttpUrl(gift.imageUrl);
 }
 
 function subscribeAdminData() {
