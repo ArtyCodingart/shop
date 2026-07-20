@@ -14,9 +14,16 @@ python3 -m http.server 4173
 
 Open `http://localhost:4173`.
 
-## Edit Gifts
+## Manage Gifts
 
-Update `gifts.json`. Each gift needs:
+Firestore collection `gifts` is the source of truth for the public catalog. Open the administration page:
+
+- locally: `http://localhost:4173/api/gifts/`
+- on GitHub Pages: `/shop/api/gifts/`
+
+Sign in with the Firebase Authentication administrator account `arty.codingart@gmail.com`. The page supports adding, editing, and deleting gifts. A reserved gift cannot be deleted until its reservation is released.
+
+On the first authorized login, an empty Firestore collection is populated from `gifts.json`. The JSON file is retained only as initial migration data. Each gift contains:
 
 - `id`
 - `title`
@@ -27,7 +34,7 @@ Update `gifts.json`. Each gift needs:
 - `marketUrl`
 - `imageUrl`
 
-Validate after editing:
+Repository validation commands:
 
 ```bash
 node --test tests/task3-behavior.test.cjs
@@ -42,14 +49,19 @@ node tests/validate-pages-workflow.mjs
 1. Create a Firebase project.
 2. Create a Firestore database.
 3. Copy the web app config into `firebase-config.js`.
-4. Publish the rules from `firestore.rules`.
+4. In Authentication, enable Email/Password and create the administrator account.
+5. Add `localhost` and the GitHub Pages domain to Authentication authorized domains.
+6. Publish the rules from `firestore.rules` in Firestore Database → Rules.
 
 Firestore uses:
 
 - `users/{phone}` for phone-based profiles; the legacy empty `selectedGiftId` remains only for deployed-rule compatibility
 - `reservations/{giftId}` as the source of truth for shared gift reservation state
+- `gifts/{giftId}` as the source of truth for the public gift catalog
 
 A phone may own any number of reservation documents. Cancelling a gift deletes only its reservation.
+
+Gift reads are public. Gift writes require the authenticated administrator email, and Firestore rules block deletion when a matching reservation exists. The administrator password is stored only by Firebase Authentication and never in this repository.
 
 The Firebase browser config is public by design. The Firestore rules protect reservations from normal overwrite/delete actions.
 

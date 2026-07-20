@@ -1,0 +1,419 @@
+:root {
+  color-scheme: light;
+  --ink: #33291f;
+  --muted: #74685c;
+  --panel: rgba(255, 252, 246, 0.96);
+  --cream: #fff7e9;
+  --oat: #ead8bf;
+  --line: rgba(91, 65, 43, 0.18);
+  --accent: #c9893f;
+  --accent-dark: #8d5728;
+  --danger: #a34132;
+  --danger-soft: #fff0eb;
+  --success: #32664b;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(235, 188, 119, 0.24), transparent 30%),
+    linear-gradient(145deg, #f4eadc, #fffaf2 55%, #ead8bf);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.admin-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 72px;
+}
+
+.login-card,
+.admin-header,
+.admin-toolbar,
+.admin-gift-card,
+.admin-dialog {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 18px 52px rgba(70, 48, 30, 0.12);
+}
+
+.login-card {
+  width: min(470px, 100%);
+  margin: 10vh auto 0;
+  padding: clamp(24px, 5vw, 42px);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-size: clamp(2rem, 5vw, 3.35rem);
+  line-height: 1;
+}
+
+h2 {
+  margin-bottom: 0;
+}
+
+.intro-copy {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.admin-form {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.admin-form label small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: #fffdf9;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+button:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(201, 137, 63, 0.16);
+}
+
+input[readonly] {
+  color: var(--muted);
+  background: #f2ece3;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.icon-button {
+  min-height: 42px;
+  border-radius: 9px;
+  padding: 10px 16px;
+  font-weight: 850;
+}
+
+.primary-button {
+  border: 0;
+  color: #2f241a;
+  background: linear-gradient(135deg, #f1cb79, #d89c4a);
+}
+
+.secondary-button,
+.icon-button {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #fffaf2;
+}
+
+.danger-button {
+  border: 1px solid rgba(163, 65, 50, 0.28);
+  color: #fff;
+  background: var(--danger);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  padding: clamp(22px, 4vw, 36px);
+}
+
+.admin-account {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin: 18px 0;
+  padding: 14px;
+}
+
+.gift-count {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.admin-status,
+.form-status {
+  margin: 0;
+  border-radius: 9px;
+  padding: 11px 13px;
+  color: var(--muted);
+  background: var(--cream);
+}
+
+.form-status {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.admin-status[data-type="error"] {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.admin-gift-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-gift-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 12px;
+}
+
+.admin-gift-card img {
+  width: 112px;
+  height: 92px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--oat);
+}
+
+.gift-copy {
+  min-width: 0;
+}
+
+.gift-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.gift-copy h2 {
+  margin-bottom: 6px;
+  font-size: 1.08rem;
+}
+
+.gift-copy p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.reservation-note {
+  display: inline-block;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--success);
+  background: #e8f4ed;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.gift-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 112px;
+}
+
+.gift-actions .danger-button {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 42px 20px;
+  color: var(--muted);
+  text-align: center;
+  background: rgba(255, 252, 246, 0.72);
+}
+
+.admin-dialog {
+  width: min(760px, calc(100% - 24px));
+  max-height: calc(100vh - 32px);
+  border: 1px solid var(--line);
+  padding: 24px;
+  color: var(--ink);
+  overflow-y: auto;
+}
+
+.admin-dialog::backdrop {
+  background: rgba(38, 29, 21, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+.delete-dialog {
+  width: min(480px, calc(100% - 24px));
+}
+
+.dialog-heading,
+.dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.icon-button {
+  min-width: 42px;
+  padding: 4px 12px;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.image-preview-wrap {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.image-preview-wrap img {
+  width: 100%;
+  max-height: 230px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--oat);
+}
+
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  max-width: min(380px, calc(100% - 40px));
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: #fff;
+  background: var(--success);
+  box-shadow: 0 16px 38px rgba(39, 31, 23, 0.24);
+}
+
+@media (max-width: 720px) {
+  .admin-shell {
+    width: min(100% - 20px, 1120px);
+    padding-top: 20px;
+  }
+
+  .admin-header,
+  .admin-account,
+  .admin-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-gift-card {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .admin-gift-card img {
+    width: 82px;
+    height: 82px;
+  }
+
+  .gift-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .full-width {
+    grid-column: auto;
+  }
+
+  .dialog-actions > * {
+    flex: 1;
+  }
+}

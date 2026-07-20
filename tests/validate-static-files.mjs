@@ -179,7 +179,7 @@ const requiredAppSnippets = [
   "selectedGiftId",
   'reservationsLoaded',
   'renderSkeletonCards',
-  "fetch('./gifts.json'",
+  "collection(state.firestore, 'gifts')",
   "collection(state.firestore, 'reservations')",
   "location.protocol === 'file:'"
 ];

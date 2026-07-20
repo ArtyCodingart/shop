@@ -2,6 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isGiftAdmin() {
+      return request.auth != null &&
+        request.auth.token.email == 'arty.codingart@gmail.com';
+    }
+
+    function isValidGift(giftId) {
+      return request.resource.data.keys().hasOnly([
+          'id',
+          'title',
+          'category',
+          'price',
+          'description',
+          'details',
+          'marketUrl',
+          'imageUrl',
+          'sortOrder',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.id == giftId &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.category is string &&
+        request.resource.data.category.size() > 0 &&
+        request.resource.data.price is string &&
+        request.resource.data.price.size() > 0 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() > 0 &&
+        request.resource.data.details is string &&
+        request.resource.data.details.size() > 0 &&
+        request.resource.data.marketUrl is string &&
+        request.resource.data.marketUrl.matches('^https?://.+') &&
+        request.resource.data.imageUrl is string &&
+        request.resource.data.imageUrl.matches('^https?://.+') &&
+        request.resource.data.sortOrder is int &&
+        request.resource.data.sortOrder >= 0 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp;
+    }
+
     match /users/{phone} {
       allow read: if true;
       allow create, update: if
@@ -25,6 +65,17 @@ service cloud.firestore {
         request.resource.data.createdAt is timestamp;
       allow update: if false;
       allow delete: if resource.data.phone is string;
+    }
+
+    match /gifts/{giftId} {
+      allow read: if true;
+      allow create: if isGiftAdmin() && isValidGift(giftId);
+      allow update: if isGiftAdmin() &&
+        isValidGift(giftId) &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.sortOrder == resource.data.sortOrder;
+      allow delete: if isGiftAdmin() &&
+        !exists(/databases/$(database)/documents/reservations/$(giftId));
     }
   }
 }

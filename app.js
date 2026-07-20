@@ -32,45 +32,45 @@ let elements;
 
 function collectElements() {
   return {
-  bootView: document.querySelector('#bootView'),
-  loginView: document.querySelector('#loginView'),
-  registerView: document.querySelector('#registerView'),
-  catalogView: document.querySelector('#catalogView'),
-  loginForm: document.querySelector('#loginForm'),
-  registerForm: document.querySelector('#registerForm'),
-  phoneNumber: document.querySelector('#phoneNumber'),
-  loginButton: document.querySelector('#loginButton'),
-  registerFirstName: document.querySelector('#registerFirstName'),
-  registerLastName: document.querySelector('#registerLastName'),
-  registerButton: document.querySelector('#registerButton'),
-  accountMenu: document.querySelector('#accountMenu'),
-  accountTrigger: document.querySelector('#accountTrigger'),
-  accountInitials: document.querySelector('#accountInitials'),
-  accountDropdown: document.querySelector('#accountDropdown'),
-  profileName: document.querySelector('#profileName'),
-  logoutButton: document.querySelector('#logoutButton'),
-  statusBanner: document.querySelector('#statusBanner'),
-  selectedGiftSection: document.querySelector('#selectedGiftSection'),
-  selectedGiftGrid: document.querySelector('#selectedGiftGrid'),
-  giftListTitle: document.querySelector('#giftListTitle'),
-  giftGrid: document.querySelector('#giftGrid'),
-  confirmModal: document.querySelector('#confirmModal'),
-  confirmDialog: document.querySelector('#confirmDialog'),
-  confirmText: document.querySelector('#confirmText'),
-  confirmPreview: document.querySelector('#confirmPreview'),
-  cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
-  confirmGiftButton: document.querySelector('#confirmGiftButton'),
-  handoffModal: document.querySelector('#handoffModal'),
-  handoffDialog: document.querySelector('#handoffDialog'),
-  handoffPreview: document.querySelector('#handoffPreview'),
-  handoffStatus: document.querySelector('#handoffStatus'),
-  handoffBackButton: document.querySelector('#handoffBackButton'),
-  handoffConfirmButton: document.querySelector('#handoffConfirmButton'),
-  cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
-  cancelSelectionDialog: document.querySelector('#cancelSelectionDialog'),
-  cancelSelectionText: document.querySelector('#cancelSelectionText'),
-  keepGiftButton: document.querySelector('#keepGiftButton'),
-  confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
+    bootView: document.querySelector('#bootView'),
+    loginView: document.querySelector('#loginView'),
+    registerView: document.querySelector('#registerView'),
+    catalogView: document.querySelector('#catalogView'),
+    loginForm: document.querySelector('#loginForm'),
+    registerForm: document.querySelector('#registerForm'),
+    phoneNumber: document.querySelector('#phoneNumber'),
+    loginButton: document.querySelector('#loginButton'),
+    registerFirstName: document.querySelector('#registerFirstName'),
+    registerLastName: document.querySelector('#registerLastName'),
+    registerButton: document.querySelector('#registerButton'),
+    accountMenu: document.querySelector('#accountMenu'),
+    accountTrigger: document.querySelector('#accountTrigger'),
+    accountInitials: document.querySelector('#accountInitials'),
+    accountDropdown: document.querySelector('#accountDropdown'),
+    profileName: document.querySelector('#profileName'),
+    logoutButton: document.querySelector('#logoutButton'),
+    statusBanner: document.querySelector('#statusBanner'),
+    selectedGiftSection: document.querySelector('#selectedGiftSection'),
+    selectedGiftGrid: document.querySelector('#selectedGiftGrid'),
+    giftListTitle: document.querySelector('#giftListTitle'),
+    giftGrid: document.querySelector('#giftGrid'),
+    confirmModal: document.querySelector('#confirmModal'),
+    confirmDialog: document.querySelector('#confirmDialog'),
+    confirmText: document.querySelector('#confirmText'),
+    confirmPreview: document.querySelector('#confirmPreview'),
+    cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
+    confirmGiftButton: document.querySelector('#confirmGiftButton'),
+    handoffModal: document.querySelector('#handoffModal'),
+    handoffDialog: document.querySelector('#handoffDialog'),
+    handoffPreview: document.querySelector('#handoffPreview'),
+    handoffStatus: document.querySelector('#handoffStatus'),
+    handoffBackButton: document.querySelector('#handoffBackButton'),
+    handoffConfirmButton: document.querySelector('#handoffConfirmButton'),
+    cancelSelectionModal: document.querySelector('#cancelSelectionModal'),
+    cancelSelectionDialog: document.querySelector('#cancelSelectionDialog'),
+    cancelSelectionText: document.querySelector('#cancelSelectionText'),
+    keepGiftButton: document.querySelector('#keepGiftButton'),
+    confirmCancelGiftButton: document.querySelector('#confirmCancelGiftButton'),
     toast: document.querySelector('#toast')
   };
 }
@@ -84,7 +84,6 @@ if (document.readyState === 'loading') {
 async function init() {
   elements = collectElements();
   bindEvents();
-  await loadGifts();
   await setupFirebase();
 
   if (state.phone && state.firebaseReady) {
@@ -135,25 +134,9 @@ function bindEvents() {
   });
 }
 
-async function loadGifts() {
-  try {
-    const response = await fetch('./gifts.json', { cache: 'no-store' });
-
-    if (!response.ok) {
-      throw new Error(`Gift catalog request failed: ${response.status}`);
-    }
-
-    state.gifts = await response.json();
-    state.giftsLoaded = true;
-  } catch (error) {
-    state.giftsLoaded = true;
-    showBanner('Не удалось загрузить список подарков. Обновите страницу чуть позже.');
-    console.error(error);
-  }
-}
-
 async function setupFirebase() {
   if (!firebaseSettings.isConfigured) {
+    state.giftsLoaded = true;
     state.reservationsLoaded = true;
     state.reservationsFailed = true;
     showBanner('Firebase еще не настроен. Каталог работает в режиме просмотра, покупка станет доступна после настройки.');
@@ -170,13 +153,37 @@ async function setupFirebase() {
     state.firebaseApi = firestoreApi;
     state.firestore = firestoreApi.getFirestore(app);
     state.firebaseReady = true;
+    subscribeToGifts();
     subscribeToReservations();
   } catch (error) {
+    state.giftsLoaded = true;
     state.reservationsLoaded = true;
     state.reservationsFailed = true;
     showBanner('Не удалось подключиться к Firebase. Доступность подарков временно не обновляется.');
     console.error(error);
   }
+}
+
+function subscribeToGifts() {
+  const { collection, onSnapshot, orderBy, query } = state.firebaseApi;
+  const giftsQuery = query(collection(state.firestore, 'gifts'), orderBy('sortOrder'));
+
+  onSnapshot(
+    giftsQuery,
+    (snapshot) => {
+      state.gifts = snapshot.docs.map((giftDoc) => ({ ...giftDoc.data(), id: giftDoc.id }));
+      state.giftsLoaded = true;
+      renderGifts();
+      renderSelectedGifts();
+    },
+    (error) => {
+      state.giftsLoaded = true;
+      showBanner('Не удалось загрузить список подарков. Обновите страницу чуть позже.');
+      renderGifts();
+      renderSelectedGifts();
+      console.error(error);
+    }
+  );
 }
 
 function showLocalFileHint() {

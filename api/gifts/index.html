@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Управление подарками</title>
+    <link rel="stylesheet" href="./admin.css">
+  </head>
+  <body>
+    <main class="admin-shell">
+      <section class="login-card" id="adminLoginView" aria-labelledby="adminLoginTitle">
+        <p class="eyebrow">Закрытый раздел</p>
+        <h1 id="adminLoginTitle">Управление подарками</h1>
+        <p class="intro-copy">Войдите через аккаунт администратора Firebase.</p>
+
+        <form class="admin-form login-form" id="adminLoginForm">
+          <label>
+            <span>Email</span>
+            <input id="adminEmail" name="email" type="email" autocomplete="username" required>
+          </label>
+          <label>
+            <span>Пароль</span>
+            <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <p class="form-status hidden" id="adminLoginStatus" role="alert"></p>
+          <button class="primary-button" id="adminLoginButton" type="submit">Войти</button>
+        </form>
+      </section>
+
+      <section class="admin-view hidden" id="adminView" aria-labelledby="adminTitle">
+        <header class="admin-header">
+          <div>
+            <p class="eyebrow">Каталог</p>
+            <h1 id="adminTitle">Все подарки</h1>
+            <p class="intro-copy">Изменения сразу появятся в общем каталоге.</p>
+          </div>
+          <div class="admin-account">
+            <span id="adminIdentity"></span>
+            <button class="secondary-button" id="logoutAdminButton" type="button">Выйти</button>
+          </div>
+        </header>
+
+        <div class="admin-toolbar">
+          <button class="primary-button" id="addGiftButton" type="button">Добавить подарок</button>
+          <span class="gift-count" id="giftCount"></span>
+        </div>
+
+        <p class="admin-status hidden" id="adminStatus" role="status"></p>
+        <div class="admin-gift-list" id="adminGiftList" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <dialog class="admin-dialog gift-dialog" id="giftDialog" aria-labelledby="giftDialogTitle">
+      <form class="admin-form" id="giftForm">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Карточка каталога</p>
+            <h2 id="giftDialogTitle">Добавить подарок</h2>
+          </div>
+          <button class="icon-button" id="closeGiftDialogButton" type="button" aria-label="Закрыть">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>ID подарка</span>
+            <input id="giftId" name="giftId" type="text" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="baby-monitor" required>
+            <small>Латинские буквы, цифры и дефисы.</small>
+          </label>
+          <label>
+            <span>Название</span>
+            <input id="giftTitle" name="giftTitle" type="text" required>
+          </label>
+          <label>
+            <span>Категория</span>
+            <input id="giftCategory" name="giftCategory" type="text" required>
+          </label>
+          <label>
+            <span>Цена</span>
+            <input id="giftPrice" name="giftPrice" type="text" placeholder="от 35 000 ₸" required>
+          </label>
+          <label class="full-width">
+            <span>Короткое описание</span>
+            <textarea id="giftDescription" name="giftDescription" rows="3" required></textarea>
+          </label>
+          <label class="full-width">
+            <span>Подробности</span>
+            <textarea id="giftDetails" name="giftDetails" rows="4" required></textarea>
+          </label>
+          <label class="full-width">
+            <span>Ссылка на магазин</span>
+            <input id="giftMarketUrl" name="giftMarketUrl" type="url" inputmode="url" placeholder="https://…" required>
+          </label>
+          <label class="full-width">
+            <span>Ссылка на изображение</span>
+            <input id="giftImageUrl" name="giftImageUrl" type="url" inputmode="url" placeholder="https://…" required>
+          </label>
+        </div>
+
+        <div class="image-preview-wrap hidden" id="giftImagePreviewWrap">
+          <span>Предпросмотр</span>
+          <img id="giftImagePreview" alt="Предпросмотр изображения подарка">
+        </div>
+
+        <p class="form-status hidden" id="giftFormStatus" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="secondary-button" id="cancelGiftFormButton" type="button">Отмена</button>
+          <button class="primary-button" id="saveGiftButton" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="admin-dialog delete-dialog" id="deleteDialog" aria-labelledby="deleteDialogTitle">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Удаление</p>
+          <h2 id="deleteDialogTitle">Удалить подарок?</h2>
+        </div>
+      </div>
+      <p id="deleteDialogText"></p>
+      <p class="form-status hidden" id="deleteStatus" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="secondary-button" id="cancelDeleteButton" type="button">Отмена</button>
+        <button class="danger-button" id="confirmDeleteButton" type="button">Удалить</button>
+      </div>
+    </dialog>
+
+    <div class="toast hidden" id="adminToast" role="status"></div>
+
+    <script src="../../firebase-config.js"></script>
+    <script type="module" src="./admin.js"></script>
+  </body>
+</html>
